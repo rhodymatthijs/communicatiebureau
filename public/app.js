@@ -7,6 +7,9 @@ const state = {
   revisionRound: 0,
   userFeedback: "",
   results: { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] },
+  calendarEvents: {},
+  calendarMonth: new Date().getMonth(),
+  calendarYear: new Date().getFullYear(),
 };
 
 // DOM refs
@@ -115,7 +118,7 @@ function extractColorsFromImage(src) {
   img.onload = () => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    const size = 100; // downsample for speed
+    const size = 100;
     canvas.width = size;
     canvas.height = size;
     ctx.drawImage(img, 0, 0, size, size);
@@ -125,19 +128,17 @@ function extractColorsFromImage(src) {
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
-      if (a < 128) continue; // skip transparent
+      if (a < 128) continue;
 
-      // Skip near-white, near-black, and grey
       const max = Math.max(r, g, b);
       const min = Math.min(r, g, b);
       const saturation = max === 0 ? 0 : (max - min) / max;
       const brightness = max / 255;
 
-      if (saturation < 0.15) continue; // skip greys/whites/blacks
-      if (brightness < 0.1) continue;  // skip very dark
-      if (brightness > 0.95 && saturation < 0.2) continue; // skip near-white
+      if (saturation < 0.15) continue;
+      if (brightness < 0.1) continue;
+      if (brightness > 0.95 && saturation < 0.2) continue;
 
-      // Quantize to reduce noise (round to nearest 16)
       const qr = Math.round(r / 16) * 16;
       const qg = Math.round(g / 16) * 16;
       const qb = Math.round(b / 16) * 16;
@@ -146,31 +147,24 @@ function extractColorsFromImage(src) {
       colorBuckets[key] = (colorBuckets[key] || 0) + 1;
     }
 
-    // Sort by frequency
-    const sorted = Object.entries(colorBuckets)
-      .sort((a, b) => b[1] - a[1]);
-
+    const sorted = Object.entries(colorBuckets).sort((a, b) => b[1] - a[1]);
     if (sorted.length === 0) return;
 
-    // Primary = most common color
     const primary = sorted[0][0].split(",").map(Number);
     const primaryHex = rgbToHex(primary[0], primary[1], primary[2]);
     $("#colorPrimary").value = primaryHex;
 
-    // Secondary = second most common, but sufficiently different from primary
     if (sorted.length > 1) {
-      let secondaryHex = primaryHex;
       for (let i = 1; i < sorted.length; i++) {
         const c = sorted[i][0].split(",").map(Number);
         const dist = Math.sqrt(
           (primary[0]-c[0])**2 + (primary[1]-c[1])**2 + (primary[2]-c[2])**2
         );
-        if (dist > 60) { // sufficiently different
-          secondaryHex = rgbToHex(c[0], c[1], c[2]);
+        if (dist > 60) {
+          $("#colorSecondary").value = rgbToHex(c[0], c[1], c[2]);
           break;
         }
       }
-      $("#colorSecondary").value = secondaryHex;
     }
   };
   img.src = src;
@@ -336,7 +330,6 @@ async function runRevision() {
     feedbackMap[stakeholderNames[id] || id] = text;
   }
 
-  // Eigen feedback van de gebruiker toevoegen
   if (state.userFeedback.trim()) {
     feedbackMap["Opdrachtgever (Rhody)"] = state.userFeedback;
   }
@@ -393,7 +386,7 @@ const STAKEHOLDER_PERSONAS = {
   leerling: {
     name: "Thomas Jansen",
     role: "16 jaar, 4 havo, gamert graag, leest alleen z'n telefoon",
-    bio: "Skipt alles wat langer is dan een Instagram-caption. Maar als het hem raakt, leest hij wél.",
+    bio: "Skipt alles wat langer is dan een Instagram-caption. Maar als het hem raakt, leest hij wel.",
     avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=ThomasJansen4&top=shortRound&hairColor=2c1b18&facialHairProbability=0&skinColor=ffdbb4&clothing=hoodie&clothingColor=3b82f6&accessoriesProbability=0",
   },
   docent: {
@@ -420,7 +413,6 @@ function createStakeholderCards(stakeholders) {
   const grid = $("#stakeholderGrid");
   grid.innerHTML = "";
 
-  // Update count in team bar
   const countEl = $("#stakeholderCount");
   if (countEl) countEl.textContent = stakeholders.length;
 
@@ -448,11 +440,10 @@ function createStakeholderCards(stakeholders) {
 }
 
 // ========================
-// Extract image prompts from Visual Advisor output
+// Extract image prompts
 // ========================
 function extractImagePrompts(visualsText) {
   const prompts = [];
-  // Look for English prompts typically in quotes or after "Prompt:"
   const patterns = [
     /[Pp]rompt[^:]*:\s*["""]([^"""]+)["""]/g,
     /[Pp]rompt[^:]*:\s*`([^`]+)`/g,
@@ -467,12 +458,10 @@ function extractImagePrompts(visualsText) {
     }
   }
 
-  // Fallback: look for lines that are clearly English prompts
   if (prompts.length === 0) {
     const lines = visualsText.split("\n");
     for (const line of lines) {
       const cleaned = line.replace(/^[\s*-]+/, "").trim();
-      // Heuristic: English prompt with descriptive terms
       if (
         cleaned.length > 30 &&
         /\b(photo|image|illustration|design|graphic|showing|depicting|with)\b/i.test(cleaned)
@@ -498,7 +487,6 @@ async function runImageGeneration() {
   const prompts = extractImagePrompts(state.results.visuals);
   if (prompts.length === 0) return alert("Geen image prompts gevonden in het visueel advies");
 
-  // Show image section
   $("#imagesArrow").classList.remove("hidden");
   $("#card-images").classList.remove("hidden");
   setAgentStatus("card-images", "active", `0/${prompts.length} gereed`);
@@ -506,7 +494,6 @@ async function runImageGeneration() {
   const grid = $("#imageGrid");
   grid.innerHTML = "";
 
-  // Create placeholder cards
   prompts.forEach((prompt, i) => {
     const card = document.createElement("div");
     card.className = "image-card";
@@ -519,10 +506,8 @@ async function runImageGeneration() {
     grid.appendChild(card);
   });
 
-  // Generate images (sequentially with pauze om rate limits te voorkomen)
   let completed = 0;
   for (let i = 0; i < prompts.length; i++) {
-    // Wacht 65 seconden tussen requests (OpenAI rate limit: 1/min)
     if (i > 0) {
       for (let s = 65; s > 0; s--) {
         setAgentStatus("card-images", "active", `${completed}/${prompts.length} gereed — volgende over ${s}s`);
@@ -565,11 +550,9 @@ async function runRevisionPipeline() {
 
   state.revisionRound++;
 
-  // Show revision section
   $("#revisionArrow").classList.remove("hidden");
   $("#card-revision").classList.remove("hidden");
 
-  // Update revision count badge
   const countEl = $("#revisionCount");
   if (countEl) countEl.textContent = state.revisionRound > 1 ? `#${state.revisionRound}` : "";
 
@@ -577,12 +560,10 @@ async function runRevisionPipeline() {
     setAgentStatus("card-revision", "active", `Revisieronde ${state.revisionRound}...`);
     const revision = await runRevision();
     state.results.revision = revision;
-    // Update teksten zodat volgende revisie op de laatste versie werkt
     state.results.teksten = revision;
     setAgentStatus("card-revision", "done", `Ronde ${state.revisionRound} klaar`);
     setAgentOutput("card-revision", mdToHtml(revision));
 
-    // Clear user feedback na verwerking
     const feedbackEl = $("#userFeedbackText");
     if (feedbackEl) feedbackEl.value = "";
     state.userFeedback = "";
@@ -600,7 +581,6 @@ async function runPipeline() {
   const openaiInput = document.querySelector("#openaiKey");
   state.apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
   state.openaiKey = openaiInput ? openaiInput.value.trim() : "";
-  // Als er server-side keys zijn, hoef je ze niet in de UI in te vullen
   if (!state.apiKey && !state.serverHasAnthropicKey) return alert("Vul je Anthropic API key in");
 
   const casus = getCasus();
@@ -680,7 +660,6 @@ async function runPipeline() {
 
   // Show actions
   $("#actionsBar").classList.remove("hidden");
-  // Show user feedback section
   $("#userFeedbackSection").classList.remove("hidden");
 }
 
@@ -711,6 +690,16 @@ function exportMarkdown() {
 
   if (state.results.revision)
     output += `---\n\n## Herziene teksten\n\n${state.results.revision}\n\n`;
+
+  // Calendar events
+  if (Object.keys(state.calendarEvents).length > 0) {
+    output += `---\n\n## Contentkalender\n\n`;
+    const sorted = Object.entries(state.calendarEvents).sort(([a], [b]) => a.localeCompare(b));
+    for (const [date, channels] of sorted) {
+      output += `**${date}:** ${channels.join(", ")}\n`;
+    }
+    output += "\n";
+  }
 
   const blob = new Blob([output], { type: "text/markdown" });
   const url = URL.createObjectURL(blob);
@@ -762,7 +751,6 @@ function exportPdf() {
   function addBody(text) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    // Strip markdown formatting
     const clean = text
       .replace(/\*\*(.+?)\*\*/g, "$1")
       .replace(/\*(.+?)\*/g, "$1")
@@ -789,39 +777,34 @@ function exportPdf() {
   addTitle(`Communicatieplan: ${casus.titel || "Casus"}`);
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Organisatie: ${huisstijl.organisatie || "—"}`, margin, y);
+  doc.text(`Organisatie: ${huisstijl.organisatie || "\u2014"}`, margin, y);
   y += 5;
   doc.text(`Datum: ${new Date().toLocaleDateString("nl-NL")}`, margin, y);
   y += 10;
   addSeparator();
 
-  // Casus
   addSubtitle("Casus");
   addBody(casus.beschrijving);
   addSeparator();
 
-  // Plan
   if (state.results.plan) {
     addSubtitle("Communicatieplan");
     addBody(state.results.plan);
     addSeparator();
   }
 
-  // Teksten
   if (state.results.teksten) {
     addSubtitle("Teksten");
     addBody(state.results.teksten);
     addSeparator();
   }
 
-  // Visueel advies
   if (state.results.visuals) {
     addSubtitle("Visueel advies");
     addBody(state.results.visuals);
     addSeparator();
   }
 
-  // Stakeholder reviews
   const stakeholderNames = {
     ouder: "Ouder", leerling: "Leerling", docent: "Docent",
     directeur: "Directeur", rvt: "Raad van Toezicht",
@@ -832,10 +815,18 @@ function exportPdf() {
     addSeparator();
   }
 
-  // Revisie
   if (state.results.revision) {
     addSubtitle("Herziene teksten (na stakeholder feedback)");
     addBody(state.results.revision);
+    addSeparator();
+  }
+
+  // Calendar
+  if (Object.keys(state.calendarEvents).length > 0) {
+    addSubtitle("Contentkalender");
+    const sorted = Object.entries(state.calendarEvents).sort(([a], [b]) => a.localeCompare(b));
+    const calText = sorted.map(([date, channels]) => `${date}: ${channels.join(", ")}`).join("\n");
+    addBody(calText);
   }
 
   doc.save(`communicatieplan-${casus.titel?.replace(/\s+/g, "-").toLowerCase() || "export"}.pdf`);
@@ -845,27 +836,26 @@ function exportPdf() {
 // Channel Icons
 // ========================
 const CHANNEL_ICONS = {
-  "Website": { icon: "🌐", type: "Digitaal" },
-  "Intern communicatieportaal": { icon: "🏢", type: "Digitaal" },
-  "Nieuwsbrief (e-mail)": { icon: "📧", type: "Digitaal" },
-  "Direct mailing": { icon: "📬", type: "Digitaal" },
-  "Facebook": { icon: "📘", type: "Social media" },
-  "Instagram": { icon: "📷", type: "Social media" },
-  "LinkedIn": { icon: "💼", type: "Social media" },
-  "X (Twitter)": { icon: "🐦", type: "Social media" },
-  "TikTok": { icon: "🎵", type: "Social media" },
-  "Brief aan ouders": { icon: "✉️", type: "Traditioneel" },
-  "Persverklaring": { icon: "📰", type: "Traditioneel" },
-  "Interne memo": { icon: "📝", type: "Traditioneel" },
-  "Poster/flyer": { icon: "🖼️", type: "Traditioneel" },
+  "Website": { icon: "\uD83C\uDF10", type: "Digitaal" },
+  "Intern communicatieportaal": { icon: "\uD83C\uDFE2", type: "Digitaal" },
+  "Nieuwsbrief (e-mail)": { icon: "\uD83D\uDCE7", type: "Digitaal" },
+  "Direct mailing": { icon: "\uD83D\uDCEC", type: "Digitaal" },
+  "Facebook": { icon: "\uD83D\uDCD8", type: "Social media" },
+  "Instagram": { icon: "\uD83D\uDCF7", type: "Social media" },
+  "LinkedIn": { icon: "\uD83D\uDCBC", type: "Social media" },
+  "X (Twitter)": { icon: "\uD83D\uDC26", type: "Social media" },
+  "TikTok": { icon: "\uD83C\uDFB5", type: "Social media" },
+  "Brief aan ouders": { icon: "\u2709\uFE0F", type: "Traditioneel" },
+  "Persverklaring": { icon: "\uD83D\uDCF0", type: "Traditioneel" },
+  "Interne memo": { icon: "\uD83D\uDCDD", type: "Traditioneel" },
+  "Poster/flyer": { icon: "\uD83D\uDDBC\uFE0F", type: "Traditioneel" },
 };
 
 // ========================
-// Parse channel blocks from copywriter output
+// Parse channel blocks
 // ========================
 function parseChannelBlocks(text) {
   const blocks = [];
-  // Match ## [KANAAL: Name] pattern
   const regex = /##\s*\[KANAAL:\s*([^\]]+)\]\s*\n([\s\S]*?)(?=##\s*\[KANAAL:|$)/g;
   let match;
   while ((match = regex.exec(text)) !== null) {
@@ -876,7 +866,6 @@ function parseChannelBlocks(text) {
     }
   }
 
-  // Fallback: try ## Kanaalnaam pattern if no [KANAAL:] markers found
   if (blocks.length === 0) {
     const fallbackRegex = /##\s+(.+?)\s*\n([\s\S]*?)(?=##\s+|$)/g;
     while ((match = fallbackRegex.exec(text)) !== null) {
@@ -895,14 +884,12 @@ function parseChannelBlocks(text) {
 // Publicatieklaar UI
 // ========================
 function showPublicatieklaar() {
-  // Use revision text if available, otherwise copywriter text
   const sourceText = state.results.revision || state.results.teksten;
   if (!sourceText) return alert("Er zijn nog geen teksten gegenereerd");
 
   const blocks = parseChannelBlocks(sourceText);
   if (blocks.length === 0) return alert("Kon geen kanaalblokken herkennen in de output. Probeer de revisieronde eerst.");
 
-  // Switch views
   $("#stepWarRoom").classList.add("hidden");
   $("#stepPublicatie").classList.remove("hidden");
 
@@ -910,10 +897,9 @@ function showPublicatieklaar() {
   grid.innerHTML = "";
 
   blocks.forEach((block, i) => {
-    const meta = CHANNEL_ICONS[block.channel] || { icon: "📄", type: "Overig" };
-    // Strip markdown formatting for clean copyable text
+    const meta = CHANNEL_ICONS[block.channel] || { icon: "\uD83D\uDCC4", type: "Overig" };
     const cleanContent = block.content
-      .replace(/^\*Aanpassingen:.*$/gm, "")  // Remove revision notes
+      .replace(/^\*Aanpassingen:.*$/gm, "")
       .replace(/\*\*(.+?)\*\*/g, "$1")
       .replace(/\*(.+?)\*/g, "$1")
       .trim();
@@ -930,7 +916,7 @@ function showPublicatieklaar() {
           </div>
         </div>
         <button class="pub-copy-btn" data-index="${i}">
-          📋 Kopiëren
+          Kopieren
         </button>
       </div>
       <div class="pub-card-body">
@@ -940,21 +926,19 @@ function showPublicatieklaar() {
     `;
     grid.appendChild(card);
 
-    // Copy button handler
     card.querySelector(".pub-copy-btn").addEventListener("click", (e) => {
       const textarea = $(`#pub-text-${i}`);
       navigator.clipboard.writeText(textarea.value).then(() => {
         const btn = e.currentTarget;
-        btn.innerHTML = "✅ Gekopieerd!";
+        btn.textContent = "Gekopieerd!";
         btn.classList.add("copied");
         setTimeout(() => {
-          btn.innerHTML = "📋 Kopiëren";
+          btn.textContent = "Kopieren";
           btn.classList.remove("copied");
         }, 2000);
       });
     });
 
-    // Character count updater
     card.querySelector(`#pub-text-${i}`).addEventListener("input", (e) => {
       $(`#pub-count-${i}`).textContent = e.target.value.length;
     });
@@ -971,9 +955,436 @@ function copyAllChannels() {
 
   navigator.clipboard.writeText(allText).then(() => {
     const btn = $("#btnCopyAll");
-    btn.textContent = "✅ Alles gekopieerd!";
-    setTimeout(() => { btn.textContent = "📋 Alles kopiëren"; }, 2000);
+    btn.textContent = "Alles gekopieerd!";
+    setTimeout(() => { btn.textContent = "Alles kopieren"; }, 2000);
   });
+}
+
+// ========================
+// Project Library (Campaign Memory)
+// ========================
+function getProjects() {
+  return JSON.parse(localStorage.getItem("cb-projects") || "[]");
+}
+
+function saveProjects(projects) {
+  localStorage.setItem("cb-projects", JSON.stringify(projects));
+  updateProjectCount();
+}
+
+function updateProjectCount() {
+  const count = getProjects().length;
+  const el = $("#projectCount");
+  if (el) el.textContent = count;
+}
+
+function saveCurrentProject() {
+  const casus = getCasus();
+  const titel = casus.titel || "Naamloos project";
+  const huisstijl = getHuisstijl();
+
+  const project = {
+    id: Date.now().toString(),
+    titel,
+    organisatie: huisstijl.organisatie || "",
+    datum: new Date().toISOString(),
+    casus,
+    huisstijl,
+    results: JSON.parse(JSON.stringify(state.results)),
+    calendarEvents: JSON.parse(JSON.stringify(state.calendarEvents)),
+    revisionRound: state.revisionRound,
+    logoUrl: state.logoUrl,
+    selectedStakeholders: getSelectedStakeholders(),
+  };
+
+  const projects = getProjects();
+  // Update existing if same title+org, otherwise add new
+  const existingIdx = projects.findIndex(p => p.titel === titel && p.organisatie === project.organisatie);
+  if (existingIdx >= 0) {
+    project.id = projects[existingIdx].id;
+    projects[existingIdx] = project;
+  } else {
+    projects.unshift(project);
+  }
+
+  saveProjects(projects);
+  alert(`Project "${titel}" opgeslagen.`);
+}
+
+function loadProject(projectId) {
+  const projects = getProjects();
+  const project = projects.find(p => p.id === projectId);
+  if (!project) return;
+
+  // Restore casus form
+  $("#casusTitel").value = project.casus.titel || "";
+  $("#casusBeschrijving").value = project.casus.beschrijving || "";
+  $("#casusContext").value = project.casus.context || "";
+  $("#casusLinks").value = project.casus.links || "";
+  $("#casusUrgentie").value = project.casus.urgentie || "";
+
+  // Restore doelgroepen
+  $$('.checkbox-inline .checkbox input').forEach(cb => {
+    cb.checked = project.casus.doelgroepen?.includes(cb.value) || false;
+  });
+
+  // Restore kanalen
+  $$('.channel-grid .checkbox input').forEach(cb => {
+    cb.checked = project.casus.kanalen?.includes(cb.value) || false;
+  });
+
+  // Restore stakeholders
+  $$('input[name="stakeholder"]').forEach(cb => {
+    cb.checked = project.selectedStakeholders?.includes(cb.value) || false;
+  });
+
+  // Restore huisstijl
+  $("#organisatie").value = project.huisstijl?.organisatie || "";
+  $("#colorPrimary").value = project.huisstijl?.primair || "#1a365d";
+  $("#colorSecondary").value = project.huisstijl?.secundair || "#e53e3e";
+  $("#font").value = project.huisstijl?.font || "";
+  if (project.huisstijl?.toneOfVoice) {
+    $("#toneOfVoice").value = project.huisstijl.toneOfVoice;
+  }
+
+  // Restore logo
+  if (project.logoUrl) {
+    state.logoUrl = project.logoUrl;
+    $("#logoPreview").innerHTML = `<img src="${project.logoUrl}" alt="Logo">`;
+  }
+
+  // Restore results
+  state.results = project.results || { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] };
+  state.calendarEvents = project.calendarEvents || {};
+  state.revisionRound = project.revisionRound || 0;
+
+  // Close modal
+  closeProjectModal();
+
+  // If there are results, show the war room
+  if (state.results.plan) {
+    $("#stepCasus").classList.add("hidden");
+    $("#stepWarRoom").classList.remove("hidden");
+    $("#casusTitle").textContent = project.casus.titel || "";
+
+    // Recreate stakeholder cards
+    createStakeholderCards(project.selectedStakeholders || []);
+
+    // Restore agent outputs
+    setAgentStatus("card-strategist", "done", "Klaar");
+    setAgentOutput("card-strategist", mdToHtml(state.results.plan));
+
+    if (state.results.teksten) {
+      setAgentStatus("card-copywriter", "done", "Klaar");
+      setAgentOutput("card-copywriter", mdToHtml(state.results.teksten));
+    }
+
+    if (state.results.visuals) {
+      setAgentStatus("card-visualAdvisor", "done", "Klaar");
+      setAgentOutput("card-visualAdvisor", mdToHtml(state.results.visuals));
+    }
+
+    // Restore stakeholder reviews
+    for (const [id, review] of Object.entries(state.results.stakeholders)) {
+      const cardId = `card-stakeholder-${id}`;
+      setAgentStatus(cardId, "done", "Klaar");
+      setAgentOutput(cardId, mdToHtml(review));
+    }
+
+    // Restore revision
+    if (state.results.revision) {
+      $("#revisionArrow").classList.remove("hidden");
+      $("#card-revision").classList.remove("hidden");
+      setAgentStatus("card-revision", "done", `Ronde ${state.revisionRound} klaar`);
+      setAgentOutput("card-revision", mdToHtml(state.results.revision));
+    }
+
+    // Show actions
+    $("#actionsBar").classList.remove("hidden");
+    $("#userFeedbackSection").classList.remove("hidden");
+  }
+}
+
+function deleteProject(projectId) {
+  if (!confirm("Dit project verwijderen?")) return;
+  const projects = getProjects().filter(p => p.id !== projectId);
+  saveProjects(projects);
+  renderProjectList();
+}
+
+function renderProjectList() {
+  const list = $("#projectList");
+  const projects = getProjects();
+
+  if (projects.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">\uD83D\uDCC2</div>
+        <p>Nog geen opgeslagen projecten.<br>Start een casus en sla het op om het hier terug te vinden.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = projects.map(p => {
+    const date = new Date(p.datum).toLocaleDateString("nl-NL", {
+      day: "numeric", month: "short", year: "numeric"
+    });
+    const hasResults = !!p.results?.plan;
+    const channels = p.casus?.kanalen?.length || 0;
+    return `
+      <div class="project-item" data-id="${p.id}">
+        <div class="project-icon">${hasResults ? "\u2705" : "\uD83D\uDCC4"}</div>
+        <div class="project-info">
+          <h4>${p.titel}</h4>
+          <div class="project-meta">
+            <span>${p.organisatie || "Geen organisatie"}</span>
+            <span>${date}</span>
+            <span>${channels} kanalen</span>
+          </div>
+        </div>
+        <div class="project-actions">
+          <button class="project-delete" data-id="${p.id}" title="Verwijderen">&times;</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // Event handlers
+  list.querySelectorAll(".project-item").forEach(item => {
+    item.addEventListener("click", (e) => {
+      if (e.target.closest(".project-delete")) return;
+      loadProject(item.dataset.id);
+    });
+  });
+
+  list.querySelectorAll(".project-delete").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteProject(btn.dataset.id);
+    });
+  });
+}
+
+function openProjectModal() {
+  renderProjectList();
+  $("#projectModal").classList.add("visible");
+}
+
+function closeProjectModal() {
+  $("#projectModal").classList.remove("visible");
+}
+
+// Init project count
+updateProjectCount();
+
+// ========================
+// Content Calendar
+// ========================
+const MONTH_NAMES = [
+  "Januari", "Februari", "Maart", "April", "Mei", "Juni",
+  "Juli", "Augustus", "September", "Oktober", "November", "December"
+];
+
+const DAY_NAMES = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+
+function getChannelType(channel) {
+  const meta = CHANNEL_ICONS[channel];
+  if (!meta) return "digitaal";
+  if (meta.type === "Social media") return "social";
+  if (meta.type === "Traditioneel") return "traditioneel";
+  return "digitaal";
+}
+
+function renderCalendar() {
+  const grid = $("#calendarGrid");
+  if (!grid) return;
+
+  const year = state.calendarYear;
+  const month = state.calendarMonth;
+
+  // Update month label
+  $("#calendarMonth").textContent = `${MONTH_NAMES[month]} ${year}`;
+
+  // Calculate calendar grid
+  const firstDay = new Date(year, month, 1);
+  let startDow = firstDay.getDay(); // 0=Sun
+  startDow = startDow === 0 ? 6 : startDow - 1; // Convert to Mon=0
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  let html = DAY_NAMES.map(d => `<div class="calendar-day-header">${d}</div>`).join("");
+
+  // Prev month days
+  for (let i = startDow - 1; i >= 0; i--) {
+    const day = daysInPrevMonth - i;
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const dateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    html += renderCalendarDay(day, dateStr, true, false);
+  }
+
+  // Current month days
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const isToday = dateStr === todayStr;
+    html += renderCalendarDay(day, dateStr, false, isToday);
+  }
+
+  // Next month days to fill grid
+  const totalCells = startDow + daysInMonth;
+  const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let day = 1; day <= remaining; day++) {
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
+    const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    html += renderCalendarDay(day, dateStr, true, false);
+  }
+
+  grid.innerHTML = html;
+
+  // Add click handlers
+  grid.querySelectorAll(".calendar-day").forEach(cell => {
+    cell.addEventListener("click", (e) => {
+      if (e.target.closest(".calendar-event")) return;
+      toggleCalendarPopover(cell, cell.dataset.date);
+    });
+  });
+
+  // Add event remove handlers
+  grid.querySelectorAll(".calendar-event").forEach(ev => {
+    ev.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const date = ev.dataset.date;
+      const channel = ev.dataset.channel;
+      removeCalendarEvent(date, channel);
+    });
+  });
+}
+
+function renderCalendarDay(day, dateStr, isOtherMonth, isToday) {
+  const events = state.calendarEvents[dateStr] || [];
+  const classes = ["calendar-day"];
+  if (isOtherMonth) classes.push("other-month");
+  if (isToday) classes.push("today");
+
+  let eventsHtml = events.map(ch => {
+    const type = getChannelType(ch);
+    const icon = CHANNEL_ICONS[ch]?.icon || "";
+    return `<div class="calendar-event type-${type}" data-date="${dateStr}" data-channel="${ch}" title="Klik om te verwijderen">${icon} ${ch}</div>`;
+  }).join("");
+
+  return `
+    <div class="${classes.join(" ")}" data-date="${dateStr}">
+      <div class="calendar-day-number">${isToday ? `<span>${day}</span>` : day}</div>
+      ${eventsHtml}
+    </div>
+  `;
+}
+
+function toggleCalendarPopover(cell, dateStr) {
+  // Remove existing popovers
+  document.querySelectorAll(".calendar-popover").forEach(p => p.remove());
+
+  // Get available channels
+  const casus = getCasus();
+  const channels = casus.kanalen?.length > 0 ? casus.kanalen : Object.keys(CHANNEL_ICONS);
+  const currentEvents = state.calendarEvents[dateStr] || [];
+
+  const popover = document.createElement("div");
+  popover.className = "calendar-popover";
+  popover.innerHTML = `
+    <h4>Kanaal inplannen op ${dateStr}</h4>
+    ${channels.map(ch => {
+      const isSelected = currentEvents.includes(ch);
+      const icon = CHANNEL_ICONS[ch]?.icon || "";
+      return `<div class="channel-option ${isSelected ? "selected" : ""}" data-channel="${ch}">${icon} ${ch}</div>`;
+    }).join("")}
+  `;
+
+  cell.style.position = "relative";
+  cell.appendChild(popover);
+
+  // Channel option click handlers
+  popover.querySelectorAll(".channel-option").forEach(opt => {
+    opt.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const channel = opt.dataset.channel;
+      if (opt.classList.contains("selected")) {
+        removeCalendarEvent(dateStr, channel);
+      } else {
+        addCalendarEvent(dateStr, channel);
+      }
+      popover.remove();
+    });
+  });
+
+  // Close on outside click
+  const closeHandler = (e) => {
+    if (!popover.contains(e.target)) {
+      popover.remove();
+      document.removeEventListener("click", closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener("click", closeHandler), 0);
+}
+
+function addCalendarEvent(dateStr, channel) {
+  if (!state.calendarEvents[dateStr]) {
+    state.calendarEvents[dateStr] = [];
+  }
+  if (!state.calendarEvents[dateStr].includes(channel)) {
+    state.calendarEvents[dateStr].push(channel);
+  }
+  renderCalendar();
+}
+
+function removeCalendarEvent(dateStr, channel) {
+  if (!state.calendarEvents[dateStr]) return;
+  state.calendarEvents[dateStr] = state.calendarEvents[dateStr].filter(ch => ch !== channel);
+  if (state.calendarEvents[dateStr].length === 0) {
+    delete state.calendarEvents[dateStr];
+  }
+  renderCalendar();
+}
+
+function showCalendar() {
+  $("#stepPublicatie").classList.add("hidden");
+  $("#stepCalendar").classList.remove("hidden");
+  renderCalendar();
+}
+
+function exportCalendar() {
+  const events = state.calendarEvents;
+  if (Object.keys(events).length === 0) return alert("Geen kalender-items om te exporteren");
+
+  let ical = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Communicatiebureau AI//NL\n";
+
+  for (const [date, channels] of Object.entries(events)) {
+    for (const channel of channels) {
+      const dateClean = date.replace(/-/g, "");
+      ical += `BEGIN:VEVENT\n`;
+      ical += `DTSTART;VALUE=DATE:${dateClean}\n`;
+      ical += `DTEND;VALUE=DATE:${dateClean}\n`;
+      ical += `SUMMARY:Publicatie: ${channel}\n`;
+      ical += `DESCRIPTION:${getCasus().titel || "Communicatiecasus"} - ${channel}\n`;
+      ical += `END:VEVENT\n`;
+    }
+  }
+
+  ical += "END:VCALENDAR";
+
+  const blob = new Blob([ical], { type: "text/calendar" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `contentkalender-${getCasus().titel?.replace(/\s+/g, "-").toLowerCase() || "export"}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ========================
@@ -987,6 +1398,7 @@ $("#btnNewCasus").addEventListener("click", () => {
   state.results = { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] };
   state.revisionRound = 0;
   state.userFeedback = "";
+  state.calendarEvents = {};
   const feedbackEl = $("#userFeedbackText");
   if (feedbackEl) feedbackEl.value = "";
   $("#userFeedbackSection").classList.add("hidden");
@@ -1013,7 +1425,7 @@ $("#btnRevision").addEventListener("click", runRevisionPipeline);
 $("#btnGenerateImages").addEventListener("click", runImageGeneration);
 $("#btnPublicatieklaar").addEventListener("click", showPublicatieklaar);
 
-// Eigen feedback toggle
+// User feedback toggle
 $("#btnUserFeedback").addEventListener("click", () => {
   const section = $("#userFeedbackSection");
   section.classList.toggle("hidden");
@@ -1037,7 +1449,6 @@ $("#docFiles").addEventListener("change", async (e) => {
       state.documents.push({ name: file.name, size: file.size, content: text });
       renderDocList();
     } catch {
-      // Binary file — read as base64 description
       state.documents.push({ name: file.name, size: file.size, content: `[Binair bestand: ${file.name}, ${(file.size/1024).toFixed(0)}KB]` });
       renderDocList();
     }
@@ -1049,7 +1460,7 @@ function renderDocList() {
   const list = $("#docList");
   list.innerHTML = state.documents.map((d, i) => `
     <div class="doc-item">
-      <span class="doc-item-name">📄 ${d.name}</span>
+      <span class="doc-item-name">\uD83D\uDCC4 ${d.name}</span>
       <span class="doc-item-size">${(d.size/1024).toFixed(0)} KB</span>
       <button class="doc-remove" data-index="${i}">&times;</button>
     </div>
@@ -1062,6 +1473,8 @@ function renderDocList() {
     });
   });
 }
+
+// Export buttons
 $("#btnExportMd").addEventListener("click", exportMarkdown);
 $("#btnExportPdf").addEventListener("click", exportPdf);
 
@@ -1078,12 +1491,51 @@ $("#btnExportMd2").addEventListener("click", exportMarkdown);
 $("#btnExportPdf2").addEventListener("click", exportPdf);
 $("#btnCopyAll").addEventListener("click", copyAllChannels);
 
+// Calendar buttons
+$("#btnToCalendar").addEventListener("click", showCalendar);
+$("#btnBackToPub").addEventListener("click", () => {
+  $("#stepCalendar").classList.add("hidden");
+  $("#stepPublicatie").classList.remove("hidden");
+});
+$("#btnBackToPub2").addEventListener("click", () => {
+  $("#stepCalendar").classList.add("hidden");
+  $("#stepPublicatie").classList.remove("hidden");
+});
+$("#btnPrevMonth").addEventListener("click", () => {
+  state.calendarMonth--;
+  if (state.calendarMonth < 0) {
+    state.calendarMonth = 11;
+    state.calendarYear--;
+  }
+  renderCalendar();
+});
+$("#btnNextMonth").addEventListener("click", () => {
+  state.calendarMonth++;
+  if (state.calendarMonth > 11) {
+    state.calendarMonth = 0;
+    state.calendarYear++;
+  }
+  renderCalendar();
+});
+$("#btnExportCalendar").addEventListener("click", exportCalendar);
+$("#btnExportMd3").addEventListener("click", exportMarkdown);
+$("#btnExportPdf3").addEventListener("click", exportPdf);
+
+// Project buttons
+$("#btnSaveProject").addEventListener("click", saveCurrentProject);
+$("#btnSaveProject2").addEventListener("click", saveCurrentProject);
+$("#btnOpenProjects").addEventListener("click", openProjectModal);
+$("#btnCloseModal").addEventListener("click", closeProjectModal);
+$("#projectModal").addEventListener("click", (e) => {
+  if (e.target === $("#projectModal")) closeProjectModal();
+});
+
 // Template buttons
 $("#btnSaveTemplate").addEventListener("click", saveTemplate);
 $("#templateSelect").addEventListener("change", (e) => loadTemplate(e.target.value));
 $("#btnDeleteTemplate").addEventListener("click", deleteTemplate);
 
-// Check server-side API keys bij laden
+// Check server-side API keys
 (async () => {
   try {
     const res = await fetch("/api/config");
@@ -1092,14 +1544,14 @@ $("#btnDeleteTemplate").addEventListener("click", deleteTemplate);
     state.serverHasOpenaiKey = config.hasOpenaiKey;
 
     if (config.hasAnthropicKey) {
-      const el = $("#apiKey").closest(".sidebar-section");
-      if (el) el.innerHTML = '<label class="label">Anthropic API Key</label><div style="color: var(--success); font-size: 0.85rem;">✅ Geconfigureerd via .env</div>';
+      const el = $("#apiKey")?.closest(".sidebar-section");
+      if (el) el.innerHTML = '<label class="label">Anthropic API Key</label><div style="color: var(--success); font-size: 0.85rem; font-weight: 500;">Geconfigureerd via .env</div>';
     }
     if (config.hasOpenaiKey) {
-      const el = $("#openaiKey").closest(".sidebar-section");
-      if (el) el.innerHTML = '<label class="label">OpenAI API Key (voor visuals)</label><div style="color: var(--success); font-size: 0.85rem;">✅ Geconfigureerd via .env</div>';
+      const el = $("#openaiKey")?.closest(".sidebar-section");
+      if (el) el.innerHTML = '<label class="label">OpenAI API Key (voor visuals)</label><div style="color: var(--success); font-size: 0.85rem; font-weight: 500;">Geconfigureerd via .env</div>';
     }
   } catch (e) {
-    // Server niet bereikbaar, velden blijven zichtbaar
+    // Server not available, fields stay visible
   }
 })();

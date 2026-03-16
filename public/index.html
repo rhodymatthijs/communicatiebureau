@@ -6,7 +6,7 @@
   <title>Communicatiebureau AI</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="app">
@@ -17,6 +17,14 @@
         <span class="badge">AI</span>
       </div>
 
+      <!-- Project Library Button -->
+      <button class="project-library-btn" id="btnOpenProjects">
+        <span>&#128194;</span> Projecten
+        <span class="project-count" id="projectCount">0</span>
+      </button>
+
+      <div class="sidebar-divider"></div>
+
       <div class="sidebar-section">
         <label class="label">Anthropic API Key</label>
         <input type="password" id="apiKey" placeholder="sk-ant-..." class="input">
@@ -26,6 +34,8 @@
         <label class="label">OpenAI API Key (voor visuals)</label>
         <input type="password" id="openaiKey" placeholder="sk-..." class="input">
       </div>
+
+      <div class="sidebar-divider"></div>
 
       <div class="sidebar-section">
         <label class="label">Organisatie</label>
@@ -112,14 +122,14 @@
 
         <div class="form-group">
           <label class="label">Referentie-links (optioneel)</label>
-          <textarea id="casusLinks" rows="2" placeholder="Plak hier links naar relevante pagina's, documenten, eerdere communicatie etc. (één per regel)" class="input"></textarea>
+          <textarea id="casusLinks" rows="2" placeholder="Plak hier links naar relevante pagina's, documenten, eerdere communicatie etc. (een per regel)" class="input"></textarea>
         </div>
 
         <div class="form-group">
           <label class="label">Documenten uploaden (optioneel)</label>
           <div class="doc-upload-area" id="docUploadArea">
             <input type="file" id="docFiles" multiple accept=".pdf,.doc,.docx,.txt,.rtf,.md" hidden>
-            <button class="btn btn-secondary btn-small" id="btnUploadDocs">📎 Documenten toevoegen</button>
+            <button class="btn btn-secondary btn-small" id="btnUploadDocs">+ Documenten toevoegen</button>
             <div class="doc-list" id="docList"></div>
           </div>
         </div>
@@ -190,7 +200,7 @@
                 <img class="avatar-img avatar-sm" src="https://api.dicebear.com/9.x/avataaars/svg?seed=ThomasJansen4&top=shortRound&hairColor=2c1b18&facialHairProbability=0&skinColor=ffdbb4&clothing=hoodie&clothingColor=3b82f6&accessoriesProbability=0" alt="Thomas">
                 <div>
                   <strong>Thomas Jansen</strong>
-                  <span>16 jaar, 4 havo, gamert graag, vindt school "oké", leest alleen z'n telefoon</span>
+                  <span>16 jaar, 4 havo, gamert graag, vindt school "oke", leest alleen z'n telefoon</span>
                 </div>
               </div>
             </label>
@@ -286,7 +296,7 @@
             <div class="agent-output"></div>
           </div>
 
-          <div class="pipeline-arrow">▼</div>
+          <div class="pipeline-arrow">&#9660;</div>
 
           <!-- Copywriter & Visual parallel -->
           <div class="pipeline-parallel">
@@ -317,7 +327,7 @@
             </div>
           </div>
 
-          <div class="pipeline-arrow">▼</div>
+          <div class="pipeline-arrow">&#9660;</div>
 
           <!-- Stakeholder reviews -->
           <div class="stakeholder-grid" id="stakeholderGrid">
@@ -325,7 +335,7 @@
           </div>
 
           <!-- Revision round -->
-          <div class="pipeline-arrow hidden" id="revisionArrow">▼</div>
+          <div class="pipeline-arrow hidden" id="revisionArrow">&#9660;</div>
           <div class="agent-card hidden" id="card-revision">
             <div class="agent-header">
               <img class="avatar-img avatar-lg" src="https://api.dicebear.com/9.x/avataaars/svg?seed=JoostBakker7&top=shortFlat&hairColor=b58143&facialHair=beardLight&facialHairColor=b58143&skinColor=ffdbb4&clothing=shirtCrewNeck&clothingColor=f59e0b&accessoriesProbability=0" alt="Joost">
@@ -339,10 +349,10 @@
           </div>
 
           <!-- Generated images -->
-          <div class="pipeline-arrow hidden" id="imagesArrow">▼</div>
+          <div class="pipeline-arrow hidden" id="imagesArrow">&#9660;</div>
           <div class="agent-card hidden" id="card-images">
             <div class="agent-header">
-              <span class="agent-emoji">🖼️</span>
+              <span class="agent-emoji">&#128444;</span>
               <span class="agent-name">Gegenereerde visuals</span>
               <span class="agent-status status-waiting">Wacht...</span>
             </div>
@@ -366,12 +376,13 @@
 
         <div class="actions hidden" id="actionsBar">
           <button class="btn btn-secondary" id="btnNewCasus">Nieuwe casus</button>
-          <button class="btn btn-primary" id="btnUserFeedback">✏️ Eigen feedback geven</button>
+          <button class="btn btn-secondary" id="btnSaveProject">Opslaan</button>
+          <button class="btn btn-primary" id="btnUserFeedback">Eigen feedback geven</button>
           <button class="btn btn-primary" id="btnRevision">Revisieronde starten <span class="revision-count" id="revisionCount"></span></button>
           <button class="btn btn-primary" id="btnGenerateImages">Visuals genereren</button>
-          <button class="btn btn-accent" id="btnPublicatieklaar">📋 Publicatieklaar maken</button>
-          <button class="btn btn-secondary" id="btnExportMd">Export Markdown</button>
-          <button class="btn btn-primary" id="btnExportPdf">Export PDF</button>
+          <button class="btn btn-accent" id="btnPublicatieklaar">Publicatieklaar maken</button>
+          <button class="btn btn-secondary" id="btnExportMd">Export MD</button>
+          <button class="btn btn-secondary" id="btnExportPdf">Export PDF</button>
         </div>
       </section>
 
@@ -380,20 +391,73 @@
         <div class="step-header">
           <span class="step-number">3</span>
           <h2>Publicatieklaar</h2>
-          <button class="btn btn-secondary btn-small" id="btnBackToWarRoom">← Terug naar War Room</button>
+          <button class="btn btn-secondary btn-small" id="btnBackToWarRoom">&larr; Terug naar War Room</button>
         </div>
-        <p class="pub-intro">Hieronder staan alle teksten per kanaal, klaar om te kopiëren en te publiceren. Klik op een veld om de tekst te kopiëren.</p>
+        <p class="pub-intro">Hieronder staan alle teksten per kanaal, klaar om te kopieren en te publiceren.</p>
         <div class="pub-grid" id="pubGrid">
           <!-- Filled dynamically -->
         </div>
         <div class="actions">
-          <button class="btn btn-secondary" id="btnBackToWarRoom2">← Terug naar War Room</button>
-          <button class="btn btn-secondary" id="btnExportMd2">Export Markdown</button>
-          <button class="btn btn-primary" id="btnExportPdf2">Export PDF</button>
-          <button class="btn btn-accent" id="btnCopyAll">📋 Alles kopiëren</button>
+          <button class="btn btn-secondary" id="btnBackToWarRoom2">&larr; Terug</button>
+          <button class="btn btn-primary" id="btnToCalendar">Contentkalender &rarr;</button>
+          <button class="btn btn-secondary" id="btnExportMd2">Export MD</button>
+          <button class="btn btn-secondary" id="btnExportPdf2">Export PDF</button>
+          <button class="btn btn-accent" id="btnCopyAll">Alles kopieren</button>
+        </div>
+      </section>
+
+      <!-- Step 4: Content Calendar -->
+      <section class="step hidden" id="stepCalendar">
+        <div class="step-header">
+          <span class="step-number">4</span>
+          <h2>Contentkalender</h2>
+          <button class="btn btn-secondary btn-small" id="btnBackToPub">&larr; Terug naar teksten</button>
+        </div>
+
+        <div class="calendar-controls">
+          <div class="calendar-nav">
+            <button id="btnPrevMonth">&larr;</button>
+            <span class="calendar-month" id="calendarMonth"></span>
+            <button id="btnNextMonth">&rarr;</button>
+          </div>
+          <div>
+            <button class="btn btn-secondary btn-small" id="btnExportCalendar">Kalender exporteren</button>
+          </div>
+        </div>
+
+        <div class="calendar-grid" id="calendarGrid">
+          <!-- Filled dynamically -->
+        </div>
+
+        <div class="calendar-legend">
+          <div class="calendar-legend-item"><span class="calendar-legend-dot digitaal"></span> Digitaal</div>
+          <div class="calendar-legend-item"><span class="calendar-legend-dot social"></span> Social media</div>
+          <div class="calendar-legend-item"><span class="calendar-legend-dot traditioneel"></span> Traditioneel</div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-secondary" id="btnBackToPub2">&larr; Terug</button>
+          <button class="btn btn-secondary" id="btnSaveProject2">Project opslaan</button>
+          <button class="btn btn-secondary" id="btnExportMd3">Export MD</button>
+          <button class="btn btn-primary" id="btnExportPdf3">Export PDF</button>
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- Project Library Modal -->
+  <div class="modal-overlay" id="projectModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Projecten</h3>
+        <button class="modal-close" id="btnCloseModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="project-list" id="projectList">
+          <!-- Filled dynamically -->
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
