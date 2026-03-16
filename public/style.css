@@ -1545,6 +1545,214 @@ select.input {
 .calendar-legend-dot.traditioneel { background: rgba(16, 185, 129, 0.5); }
 
 /* ========================
+   Progress Bar
+   ======================== */
+.progress-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 16px 24px 20px;
+  margin: -40px -48px 32px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: color 0.3s;
+  white-space: nowrap;
+}
+
+.progress-step.active {
+  color: var(--accent);
+}
+
+.progress-step.completed {
+  color: var(--success);
+}
+
+.progress-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--bg-input);
+  border: 2px solid var(--border);
+  transition: all 0.3s;
+  flex-shrink: 0;
+}
+
+.progress-step.active .progress-dot {
+  background: var(--gradient);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: var(--shadow-accent);
+}
+
+.progress-step.completed .progress-dot {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+}
+
+.progress-line {
+  width: 48px;
+  height: 2px;
+  background: var(--border);
+  margin: 0 8px;
+  transition: background 0.3s;
+}
+
+.progress-line.completed {
+  background: var(--success);
+}
+
+/* ========================
+   Readability Badge
+   ======================== */
+.pub-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.readability-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.readability-badge.level-easy {
+  background: var(--success-light);
+  color: #047857;
+}
+
+.readability-badge.level-medium {
+  background: var(--warning-light);
+  color: #92400e;
+}
+
+.readability-badge.level-hard {
+  background: var(--error-light);
+  color: #b91c1c;
+}
+
+.char-limit-warning {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.char-limit-ok {
+  color: var(--text-dim);
+}
+
+/* ========================
+   A/B Variant Tabs
+   ======================== */
+.variant-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+
+.variant-tab {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.variant-tab.active {
+  background: white;
+  color: var(--accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.variant-tab:hover:not(.active) {
+  color: var(--text-secondary);
+}
+
+/* ========================
+   Auto-save indicator
+   ======================== */
+.autosave-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+  z-index: 999;
+  pointer-events: none;
+}
+
+.autosave-indicator.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Autosave restore banner */
+.autosave-banner {
+  background: var(--gradient-subtle);
+  border: 1.5px solid var(--accent-border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.autosave-banner-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.autosave-banner-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ========================
    Utility
    ======================== */
 .hidden {

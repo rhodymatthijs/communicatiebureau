@@ -6,6 +6,8 @@ const state = {
   documents: [],
   revisionRound: 0,
   userFeedback: "",
+  variantMode: false,
+  currentStep: 1,
   results: { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] },
   calendarEvents: {},
   calendarMonth: new Date().getMonth(),
@@ -177,6 +179,256 @@ function rgbToHex(r, g, b) {
 }
 
 // ========================
+// Progress Bar
+// ========================
+function updateProgressBar(activeStep) {
+  state.currentStep = activeStep;
+  const steps = $$(".progress-step");
+  const lines = $$(".progress-line");
+
+  steps.forEach((step) => {
+    const stepNum = parseInt(step.dataset.step);
+    step.classList.remove("active", "completed");
+    if (stepNum === activeStep) step.classList.add("active");
+    else if (stepNum < activeStep) step.classList.add("completed");
+  });
+
+  lines.forEach((line) => {
+    const lineNum = parseInt(line.dataset.line);
+    line.classList.toggle("completed", lineNum < activeStep);
+  });
+}
+
+// ========================
+// Readability Check (Flesch-Douma for Dutch)
+// ========================
+function countSyllablesDutch(word) {
+  word = word.toLowerCase().replace(/[^a-zàáâãäåèéêëìíîïòóôõöùúûüý]/g, "");
+  if (word.length <= 2) return 1;
+
+  // Dutch diphthongs and digraphs count as single vowels
+  word = word.replace(/oe|ou|ei|ij|ui|au|eu|ie|oo|ee|uu|aa/g, "a");
+
+  let count = 0;
+  let prevVowel = false;
+  for (const ch of word) {
+    const isVowel = "aeiouy".includes(ch);
+    if (isVowel && !prevVowel) count++;
+    prevVowel = isVowel;
+  }
+
+  return Math.max(1, count);
+}
+
+function calculateReadability(text) {
+  // Clean text
+  const clean = text.replace(/[#*_\[\]()]/g, "").trim();
+  if (!clean) return null;
+
+  // Split into sentences
+  const sentences = clean.split(/[.!?]+/).filter(s => s.trim().length > 3);
+  if (sentences.length === 0) return null;
+
+  // Split into words
+  const words = clean.split(/\s+/).filter(w => w.length > 0);
+  if (words.length === 0) return null;
+
+  // Count syllables
+  const totalSyllables = words.reduce((sum, w) => sum + countSyllablesDutch(w), 0);
+
+  // Flesch-Douma formula (Dutch adaptation)
+  const avgSentenceLength = words.length / sentences.length;
+  const avgSyllablesPerWord = totalSyllables / words.length;
+  const score = 206.835 - (0.93 * avgSentenceLength) - (77 * avgSyllablesPerWord);
+
+  return {
+    score: Math.round(Math.max(0, Math.min(100, score))),
+    words: words.length,
+    sentences: sentences.length,
+    avgSentenceLength: Math.round(avgSentenceLength * 10) / 10,
+  };
+}
+
+function getReadabilityLabel(score) {
+  if (score >= 70) return { label: "B1 — Goed leesbaar", level: "easy" };
+  if (score >= 50) return { label: "B2 — Redelijk leesbaar", level: "medium" };
+  return { label: "C1+ — Moeilijk leesbaar", level: "hard" };
+}
+
+// ========================
+// Channel Character Limits
+// ========================
+const CHANNEL_LIMITS = {
+  "X (Twitter)": 280,
+  "Instagram": 2200,
+  "LinkedIn": 3000,
+  "Facebook": 500, // recommended
+  "TikTok": 2200,
+  "Poster/flyer": 300,
+};
+
+// ========================
+// Auto-save
+// ========================
+let autosaveTimeout = null;
+
+function triggerAutosave() {
+  if (autosaveTimeout) clearTimeout(autosaveTimeout);
+  autosaveTimeout = setTimeout(() => {
+    const saveData = {
+      timestamp: Date.now(),
+      currentStep: state.currentStep,
+      results: state.results,
+      calendarEvents: state.calendarEvents,
+      revisionRound: state.revisionRound,
+      variantMode: state.variantMode,
+      logoUrl: state.logoUrl,
+      form: {
+        titel: $("#casusTitel")?.value || "",
+        beschrijving: $("#casusBeschrijving")?.value || "",
+        context: $("#casusContext")?.value || "",
+        links: $("#casusLinks")?.value || "",
+        urgentie: $("#casusUrgentie")?.value || "",
+        organisatie: $("#organisatie")?.value || "",
+        primair: $("#colorPrimary")?.value || "#1a365d",
+        secundair: $("#colorSecondary")?.value || "#e53e3e",
+        font: $("#font")?.value || "",
+        toneOfVoice: $("#toneOfVoice")?.value || "",
+        doelgroepen: $$('.checkbox-inline .checkbox input:checked').map(cb => cb.value),
+        kanalen: $$('.channel-grid .checkbox input:checked').map(cb => cb.value),
+        stakeholders: $$('input[name="stakeholder"]:checked').map(cb => cb.value),
+      },
+    };
+    localStorage.setItem("cb-autosave", JSON.stringify(saveData));
+    showAutosaveIndicator();
+  }, 2000);
+}
+
+function showAutosaveIndicator() {
+  const el = $("#autosaveIndicator");
+  if (!el) return;
+  el.classList.add("visible");
+  setTimeout(() => el.classList.remove("visible"), 2000);
+}
+
+function checkAutosave() {
+  const saved = localStorage.getItem("cb-autosave");
+  if (!saved) return;
+
+  try {
+    const data = JSON.parse(saved);
+    // Only show if less than 24 hours old and has actual results
+    const age = Date.now() - data.timestamp;
+    if (age > 24 * 60 * 60 * 1000) {
+      localStorage.removeItem("cb-autosave");
+      return;
+    }
+    if (!data.results?.plan) return;
+
+    const banner = $("#autosaveBanner");
+    if (banner) banner.classList.remove("hidden");
+  } catch {
+    localStorage.removeItem("cb-autosave");
+  }
+}
+
+function restoreAutosave() {
+  const saved = localStorage.getItem("cb-autosave");
+  if (!saved) return;
+
+  try {
+    const data = JSON.parse(saved);
+
+    // Restore form
+    if (data.form) {
+      if (data.form.titel) $("#casusTitel").value = data.form.titel;
+      if (data.form.beschrijving) $("#casusBeschrijving").value = data.form.beschrijving;
+      if (data.form.context) $("#casusContext").value = data.form.context;
+      if (data.form.links) $("#casusLinks").value = data.form.links;
+      if (data.form.urgentie) $("#casusUrgentie").value = data.form.urgentie;
+      if (data.form.organisatie) $("#organisatie").value = data.form.organisatie;
+      if (data.form.primair) $("#colorPrimary").value = data.form.primair;
+      if (data.form.secundair) $("#colorSecondary").value = data.form.secundair;
+      if (data.form.font) $("#font").value = data.form.font;
+      if (data.form.toneOfVoice) $("#toneOfVoice").value = data.form.toneOfVoice;
+
+      $$('.checkbox-inline .checkbox input').forEach(cb => {
+        cb.checked = data.form.doelgroepen?.includes(cb.value) || false;
+      });
+      $$('.channel-grid .checkbox input').forEach(cb => {
+        cb.checked = data.form.kanalen?.includes(cb.value) || false;
+      });
+      $$('input[name="stakeholder"]').forEach(cb => {
+        cb.checked = data.form.stakeholders?.includes(cb.value) || false;
+      });
+    }
+
+    // Restore state
+    state.results = data.results || state.results;
+    state.calendarEvents = data.calendarEvents || {};
+    state.revisionRound = data.revisionRound || 0;
+    state.variantMode = data.variantMode || false;
+    state.logoUrl = data.logoUrl || null;
+
+    if (state.logoUrl) {
+      $("#logoPreview").innerHTML = `<img src="${state.logoUrl}" alt="Logo">`;
+    }
+
+    if ($("#variantMode")) {
+      $("#variantMode").checked = state.variantMode;
+    }
+
+    // Show war room with results
+    if (state.results.plan) {
+      $("#stepCasus").classList.add("hidden");
+      $("#stepWarRoom").classList.remove("hidden");
+      $("#casusTitle").textContent = data.form?.titel || "";
+      updateProgressBar(2);
+
+      createStakeholderCards(data.form?.stakeholders || []);
+
+      setAgentStatus("card-strategist", "done", "Klaar");
+      setAgentOutput("card-strategist", mdToHtml(state.results.plan));
+
+      if (state.results.teksten) {
+        setAgentStatus("card-copywriter", "done", "Klaar");
+        setAgentOutput("card-copywriter", mdToHtml(state.results.teksten));
+      }
+      if (state.results.visuals) {
+        setAgentStatus("card-visualAdvisor", "done", "Klaar");
+        setAgentOutput("card-visualAdvisor", mdToHtml(state.results.visuals));
+      }
+      for (const [id, review] of Object.entries(state.results.stakeholders)) {
+        setAgentStatus(`card-stakeholder-${id}`, "done", "Klaar");
+        setAgentOutput(`card-stakeholder-${id}`, mdToHtml(review));
+      }
+      if (state.results.revision) {
+        $("#revisionArrow").classList.remove("hidden");
+        $("#card-revision").classList.remove("hidden");
+        setAgentStatus("card-revision", "done", `Ronde ${state.revisionRound} klaar`);
+        setAgentOutput("card-revision", mdToHtml(state.results.revision));
+      }
+
+      $("#actionsBar").classList.remove("hidden");
+      $("#userFeedbackSection").classList.remove("hidden");
+    }
+
+    // Hide banner
+    $("#autosaveBanner").classList.add("hidden");
+  } catch {
+    localStorage.removeItem("cb-autosave");
+  }
+}
+
+function dismissAutosave() {
+  localStorage.removeItem("cb-autosave");
+  $("#autosaveBanner").classList.add("hidden");
+}
+
+// Check for autosave on load
+checkAutosave();
+
+// ========================
 // Form Data
 // ========================
 function getCasus() {
@@ -281,6 +533,7 @@ async function runAgent(agentId, extras = {}) {
     agentId,
     casus: getCasus(),
     huisstijl: getHuisstijl(),
+    variantMode: state.variantMode && agentId === "copywriter",
     ...extras,
   };
 
@@ -567,6 +820,7 @@ async function runRevisionPipeline() {
     const feedbackEl = $("#userFeedbackText");
     if (feedbackEl) feedbackEl.value = "";
     state.userFeedback = "";
+    triggerAutosave();
   } catch (err) {
     setAgentStatus("card-revision", "error", "Fout");
     setAgentOutput("card-revision", `<p style="color:var(--error)">${err.message}</p>`);
@@ -583,6 +837,8 @@ async function runPipeline() {
   state.openaiKey = openaiInput ? openaiInput.value.trim() : "";
   if (!state.apiKey && !state.serverHasAnthropicKey) return alert("Vul je Anthropic API key in");
 
+  state.variantMode = $("#variantMode")?.checked || false;
+
   const casus = getCasus();
   if (!casus.beschrijving) return alert("Beschrijf de casus voordat je het bureau start");
 
@@ -592,6 +848,7 @@ async function runPipeline() {
   $("#stepCasus").classList.add("hidden");
   $("#stepWarRoom").classList.remove("hidden");
   $("#casusTitle").textContent = casus.titel || "";
+  updateProgressBar(2);
 
   createStakeholderCards(stakeholders);
 
@@ -608,6 +865,7 @@ async function runPipeline() {
     state.results.plan = plan;
     setAgentStatus("card-strategist", "done", "Klaar");
     setAgentOutput("card-strategist", mdToHtml(plan));
+    triggerAutosave();
   } catch (err) {
     setAgentStatus("card-strategist", "error", "Fout");
     setAgentOutput("card-strategist", `<p style="color:var(--error)">${err.message}</p>`);
@@ -632,6 +890,7 @@ async function runPipeline() {
 
     setAgentStatus("card-visualAdvisor", "done", "Klaar");
     setAgentOutput("card-visualAdvisor", mdToHtml(visuals));
+    triggerAutosave();
   } catch (err) {
     setAgentStatus("card-copywriter", "error", "Fout");
     setAgentStatus("card-visualAdvisor", "error", "Fout");
@@ -661,6 +920,7 @@ async function runPipeline() {
   // Show actions
   $("#actionsBar").classList.remove("hidden");
   $("#userFeedbackSection").classList.remove("hidden");
+  triggerAutosave();
 }
 
 // ========================
@@ -883,6 +1143,37 @@ function parseChannelBlocks(text) {
 // ========================
 // Publicatieklaar UI
 // ========================
+function parseVariants(content) {
+  const variantA = content.match(/###\s*Variant A\s*\n([\s\S]*?)(?=###\s*Variant B|$)/);
+  const variantB = content.match(/###\s*Variant B\s*\n([\s\S]*?)$/);
+
+  if (variantA && variantB) {
+    return {
+      a: variantA[1].trim(),
+      b: variantB[1].trim(),
+    };
+  }
+  return null;
+}
+
+function cleanContent(text) {
+  return text
+    .replace(/^\*Aanpassingen:.*$/gm, "")
+    .replace(/###\s*Variant [AB]\s*\n?/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .trim();
+}
+
+function formatCharCount(length, channel) {
+  const limit = CHANNEL_LIMITS[channel];
+  if (!limit) return `<span class="char-limit-ok">${length} tekens</span>`;
+  if (length > limit) {
+    return `<span class="char-limit-warning">${length} / ${limit} tekens (${length - limit} te veel)</span>`;
+  }
+  return `<span class="char-limit-ok">${length} / ${limit} tekens</span>`;
+}
+
 function showPublicatieklaar() {
   const sourceText = state.results.revision || state.results.teksten;
   if (!sourceText) return alert("Er zijn nog geen teksten gegenereerd");
@@ -892,17 +1183,30 @@ function showPublicatieklaar() {
 
   $("#stepWarRoom").classList.add("hidden");
   $("#stepPublicatie").classList.remove("hidden");
+  updateProgressBar(3);
 
   const grid = $("#pubGrid");
   grid.innerHTML = "";
 
   blocks.forEach((block, i) => {
     const meta = CHANNEL_ICONS[block.channel] || { icon: "\uD83D\uDCC4", type: "Overig" };
-    const cleanContent = block.content
-      .replace(/^\*Aanpassingen:.*$/gm, "")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
-      .replace(/\*(.+?)\*/g, "$1")
-      .trim();
+    const variants = parseVariants(block.content);
+    const mainContent = cleanContent(variants ? variants.a : block.content);
+    const altContent = variants ? cleanContent(variants.b) : null;
+
+    // Readability
+    const readability = calculateReadability(mainContent);
+    const readLabel = readability ? getReadabilityLabel(readability.score) : null;
+
+    let variantTabsHtml = "";
+    if (altContent) {
+      variantTabsHtml = `
+        <div class="variant-tabs">
+          <button class="variant-tab active" data-variant="a" data-index="${i}">Variant A — Veilig</button>
+          <button class="variant-tab" data-variant="b" data-index="${i}">Variant B — Creatief</button>
+        </div>
+      `;
+    }
 
     const card = document.createElement("div");
     card.className = "pub-card";
@@ -920,15 +1224,54 @@ function showPublicatieklaar() {
         </button>
       </div>
       <div class="pub-card-body">
-        <textarea class="pub-textarea" id="pub-text-${i}" spellcheck="true">${cleanContent}</textarea>
-        <div class="pub-char-count"><span id="pub-count-${i}">${cleanContent.length}</span> tekens</div>
+        ${variantTabsHtml}
+        <textarea class="pub-textarea" id="pub-text-${i}" spellcheck="true">${mainContent}</textarea>
+        ${altContent ? `<textarea class="pub-textarea hidden" id="pub-text-${i}-b" spellcheck="true">${altContent}</textarea>` : ""}
+        <div class="pub-card-meta">
+          ${readLabel ? `<span class="readability-badge level-${readLabel.level}">${readLabel.label} (${readability.score})</span>` : ""}
+          <span class="pub-char-count" id="pub-count-${i}">${formatCharCount(mainContent.length, block.channel)}</span>
+        </div>
       </div>
     `;
     grid.appendChild(card);
 
+    // Variant tab switching
+    if (altContent) {
+      card.querySelectorAll(".variant-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          card.querySelectorAll(".variant-tab").forEach(t => t.classList.remove("active"));
+          tab.classList.add("active");
+
+          const textareaA = card.querySelector(`#pub-text-${i}`);
+          const textareaB = card.querySelector(`#pub-text-${i}-b`);
+
+          if (tab.dataset.variant === "a") {
+            textareaA.classList.remove("hidden");
+            textareaB.classList.add("hidden");
+          } else {
+            textareaA.classList.add("hidden");
+            textareaB.classList.remove("hidden");
+          }
+
+          // Update readability and char count for visible textarea
+          const visible = tab.dataset.variant === "a" ? textareaA : textareaB;
+          const r = calculateReadability(visible.value);
+          const rl = r ? getReadabilityLabel(r.score) : null;
+          const metaEl = card.querySelector(".pub-card-meta");
+          const badge = metaEl.querySelector(".readability-badge");
+          if (badge && rl) {
+            badge.className = `readability-badge level-${rl.level}`;
+            badge.textContent = `${rl.label} (${r.score})`;
+          }
+          card.querySelector(`#pub-count-${i}`).innerHTML = formatCharCount(visible.value.length, block.channel);
+        });
+      });
+    }
+
+    // Copy button
     card.querySelector(".pub-copy-btn").addEventListener("click", (e) => {
-      const textarea = $(`#pub-text-${i}`);
-      navigator.clipboard.writeText(textarea.value).then(() => {
+      const visibleTextarea = card.querySelector(".pub-textarea:not(.hidden)");
+      navigator.clipboard.writeText(visibleTextarea.value).then(() => {
         const btn = e.currentTarget;
         btn.textContent = "Gekopieerd!";
         btn.classList.add("copied");
@@ -939,8 +1282,21 @@ function showPublicatieklaar() {
       });
     });
 
-    card.querySelector(`#pub-text-${i}`).addEventListener("input", (e) => {
-      $(`#pub-count-${i}`).textContent = e.target.value.length;
+    // Update counts on input
+    card.querySelectorAll(".pub-textarea").forEach(ta => {
+      ta.addEventListener("input", () => {
+        const visibleTA = card.querySelector(".pub-textarea:not(.hidden)");
+        card.querySelector(`#pub-count-${i}`).innerHTML = formatCharCount(visibleTA.value.length, block.channel);
+
+        // Update readability
+        const r = calculateReadability(visibleTA.value);
+        const rl = r ? getReadabilityLabel(r.score) : null;
+        const badge = card.querySelector(".readability-badge");
+        if (badge && rl) {
+          badge.className = `readability-badge level-${rl.level}`;
+          badge.textContent = `${rl.label} (${r.score})`;
+        }
+      });
     });
   });
 }
@@ -1355,6 +1711,7 @@ function removeCalendarEvent(dateStr, channel) {
 function showCalendar() {
   $("#stepPublicatie").classList.add("hidden");
   $("#stepCalendar").classList.remove("hidden");
+  updateProgressBar(4);
   renderCalendar();
 }
 
@@ -1399,6 +1756,8 @@ $("#btnNewCasus").addEventListener("click", () => {
   state.revisionRound = 0;
   state.userFeedback = "";
   state.calendarEvents = {};
+  localStorage.removeItem("cb-autosave");
+  updateProgressBar(1);
   const feedbackEl = $("#userFeedbackText");
   if (feedbackEl) feedbackEl.value = "";
   $("#userFeedbackSection").classList.add("hidden");
@@ -1482,10 +1841,12 @@ $("#btnExportPdf").addEventListener("click", exportPdf);
 $("#btnBackToWarRoom").addEventListener("click", () => {
   $("#stepPublicatie").classList.add("hidden");
   $("#stepWarRoom").classList.remove("hidden");
+  updateProgressBar(2);
 });
 $("#btnBackToWarRoom2").addEventListener("click", () => {
   $("#stepPublicatie").classList.add("hidden");
   $("#stepWarRoom").classList.remove("hidden");
+  updateProgressBar(2);
 });
 $("#btnExportMd2").addEventListener("click", exportMarkdown);
 $("#btnExportPdf2").addEventListener("click", exportPdf);
@@ -1496,10 +1857,12 @@ $("#btnToCalendar").addEventListener("click", showCalendar);
 $("#btnBackToPub").addEventListener("click", () => {
   $("#stepCalendar").classList.add("hidden");
   $("#stepPublicatie").classList.remove("hidden");
+  updateProgressBar(3);
 });
 $("#btnBackToPub2").addEventListener("click", () => {
   $("#stepCalendar").classList.add("hidden");
   $("#stepPublicatie").classList.remove("hidden");
+  updateProgressBar(3);
 });
 $("#btnPrevMonth").addEventListener("click", () => {
   state.calendarMonth--;
@@ -1529,6 +1892,10 @@ $("#btnCloseModal").addEventListener("click", closeProjectModal);
 $("#projectModal").addEventListener("click", (e) => {
   if (e.target === $("#projectModal")) closeProjectModal();
 });
+
+// Autosave buttons
+$("#btnRestoreAutosave")?.addEventListener("click", restoreAutosave);
+$("#btnDismissAutosave")?.addEventListener("click", dismissAutosave);
 
 // Template buttons
 $("#btnSaveTemplate").addEventListener("click", saveTemplate);

@@ -169,7 +169,7 @@ Wees formeel, afgewogen en scherp op risico's. Eerste persoon als RvT-lid.`,
 
 // API endpoint: run agent
 app.post("/api/run-agent", async (req, res) => {
-  const { apiKey: bodyKey, agentId, casus, huisstijl, plan, teksten } = req.body;
+  const { apiKey: bodyKey, agentId, casus, huisstijl, plan, teksten, variantMode } = req.body;
   const apiKey = bodyKey || process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) return res.status(400).json({ error: "API key is vereist" });
@@ -213,6 +213,23 @@ app.post("/api/run-agent", async (req, res) => {
       userMessage += `**Logo:** ${huisstijl.logoDescription}\n`;
   }
 
+  // Inject variant mode into copywriter system prompt
+  let systemPrompt = agent.systemPrompt;
+  if (variantMode && agentId === "copywriter") {
+    systemPrompt += `\n\nBELANGRIJK — A/B VARIANT MODUS:
+Schrijf voor elk kanaal TWEE varianten: Variant A en Variant B.
+Variant A is de "veilige" versie: professioneel, compleet, conventioneel.
+Variant B is de "creatieve" versie: pakkender, onverwachter, memorabeler.
+
+Structureer als volgt:
+## [KANAAL: Kanaalnaam]
+### Variant A
+Tekst variant A hier...
+
+### Variant B
+Tekst variant B hier...`;
+  }
+
   if (plan && agentId !== "strategist") {
     userMessage += `\n\n## Communicatieplan (van de Strategist)\n${plan}`;
   }
@@ -226,7 +243,7 @@ app.post("/api/run-agent", async (req, res) => {
     const message = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 4096,
-      system: agent.systemPrompt,
+      system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     });
 
