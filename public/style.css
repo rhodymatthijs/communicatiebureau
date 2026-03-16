@@ -782,6 +782,126 @@ select.input {
   font-size: 13px;
 }
 
+/* Publicatieklaar */
+.pub-intro {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.pub-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.pub-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.pub-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--bg-input);
+  border-bottom: 1px solid var(--border);
+}
+
+.pub-channel-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pub-channel-icon {
+  font-size: 20px;
+  width: 32px;
+  text-align: center;
+}
+
+.pub-channel-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.pub-channel-type {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pub-copy-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pub-copy-btn:hover {
+  background: var(--accent-hover);
+}
+
+.pub-copy-btn.copied {
+  background: var(--success);
+}
+
+.pub-card-body {
+  padding: 20px;
+}
+
+.pub-textarea {
+  width: 100%;
+  min-height: 160px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 16px;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.7;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.pub-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.pub-char-count {
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  color: white;
+  border: none;
+}
+
+.btn-accent:hover {
+  background: linear-gradient(135deg, var(--accent-hover), #a78bfa);
+}
+
 /* Utility */
 .hidden {
   display: none !important;

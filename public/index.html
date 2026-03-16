@@ -340,8 +340,28 @@
           <button class="btn btn-secondary" id="btnNewCasus">Nieuwe casus</button>
           <button class="btn btn-primary" id="btnRevision">Revisieronde starten</button>
           <button class="btn btn-primary" id="btnGenerateImages">Visuals genereren</button>
+          <button class="btn btn-accent" id="btnPublicatieklaar">📋 Publicatieklaar maken</button>
           <button class="btn btn-secondary" id="btnExportMd">Export Markdown</button>
           <button class="btn btn-primary" id="btnExportPdf">Export PDF</button>
+        </div>
+      </section>
+
+      <!-- Step 3: Publicatieklaar -->
+      <section class="step hidden" id="stepPublicatie">
+        <div class="step-header">
+          <span class="step-number">3</span>
+          <h2>Publicatieklaar</h2>
+          <button class="btn btn-secondary btn-small" id="btnBackToWarRoom">← Terug naar War Room</button>
+        </div>
+        <p class="pub-intro">Hieronder staan alle teksten per kanaal, klaar om te kopiëren en te publiceren. Klik op een veld om de tekst te kopiëren.</p>
+        <div class="pub-grid" id="pubGrid">
+          <!-- Filled dynamically -->
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="btnBackToWarRoom2">← Terug naar War Room</button>
+          <button class="btn btn-secondary" id="btnExportMd2">Export Markdown</button>
+          <button class="btn btn-primary" id="btnExportPdf2">Export PDF</button>
+          <button class="btn btn-accent" id="btnCopyAll">📋 Alles kopiëren</button>
         </div>
       </section>
     </main>

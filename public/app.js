@@ -428,10 +428,18 @@ async function runImageGeneration() {
     grid.appendChild(card);
   });
 
-  // Generate images (sequentially to avoid rate limits)
+  // Generate images (sequentially with pauze om rate limits te voorkomen)
   let completed = 0;
   for (let i = 0; i < prompts.length; i++) {
+    // Wacht 65 seconden tussen requests (OpenAI rate limit: 1/min)
+    if (i > 0) {
+      for (let s = 65; s > 0; s--) {
+        setAgentStatus("card-images", "active", `${completed}/${prompts.length} gereed — volgende over ${s}s`);
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
     try {
+      setAgentStatus("card-images", "active", `${completed}/${prompts.length} gereed — visual ${i + 1} genereren...`);
       const result = await generateImage(prompts[i]);
       const card = $(`#image-card-${i}`);
       const placeholder = card.querySelector(".image-placeholder");
@@ -725,6 +733,141 @@ function exportPdf() {
 }
 
 // ========================
+// Channel Icons
+// ========================
+const CHANNEL_ICONS = {
+  "Website": { icon: "🌐", type: "Digitaal" },
+  "Intern communicatieportaal": { icon: "🏢", type: "Digitaal" },
+  "Nieuwsbrief (e-mail)": { icon: "📧", type: "Digitaal" },
+  "Direct mailing": { icon: "📬", type: "Digitaal" },
+  "Facebook": { icon: "📘", type: "Social media" },
+  "Instagram": { icon: "📷", type: "Social media" },
+  "LinkedIn": { icon: "💼", type: "Social media" },
+  "X (Twitter)": { icon: "🐦", type: "Social media" },
+  "TikTok": { icon: "🎵", type: "Social media" },
+  "Brief aan ouders": { icon: "✉️", type: "Traditioneel" },
+  "Persverklaring": { icon: "📰", type: "Traditioneel" },
+  "Interne memo": { icon: "📝", type: "Traditioneel" },
+  "Poster/flyer": { icon: "🖼️", type: "Traditioneel" },
+};
+
+// ========================
+// Parse channel blocks from copywriter output
+// ========================
+function parseChannelBlocks(text) {
+  const blocks = [];
+  // Match ## [KANAAL: Name] pattern
+  const regex = /##\s*\[KANAAL:\s*([^\]]+)\]\s*\n([\s\S]*?)(?=##\s*\[KANAAL:|$)/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    const channelName = match[1].trim();
+    const content = match[2].trim();
+    if (content) {
+      blocks.push({ channel: channelName, content });
+    }
+  }
+
+  // Fallback: try ## Kanaalnaam pattern if no [KANAAL:] markers found
+  if (blocks.length === 0) {
+    const fallbackRegex = /##\s+(.+?)\s*\n([\s\S]*?)(?=##\s+|$)/g;
+    while ((match = fallbackRegex.exec(text)) !== null) {
+      const channelName = match[1].trim().replace(/^\*\*|\*\*$/g, "");
+      const content = match[2].trim();
+      if (content && channelName.length < 60) {
+        blocks.push({ channel: channelName, content });
+      }
+    }
+  }
+
+  return blocks;
+}
+
+// ========================
+// Publicatieklaar UI
+// ========================
+function showPublicatieklaar() {
+  // Use revision text if available, otherwise copywriter text
+  const sourceText = state.results.revision || state.results.teksten;
+  if (!sourceText) return alert("Er zijn nog geen teksten gegenereerd");
+
+  const blocks = parseChannelBlocks(sourceText);
+  if (blocks.length === 0) return alert("Kon geen kanaalblokken herkennen in de output. Probeer de revisieronde eerst.");
+
+  // Switch views
+  $("#stepWarRoom").classList.add("hidden");
+  $("#stepPublicatie").classList.remove("hidden");
+
+  const grid = $("#pubGrid");
+  grid.innerHTML = "";
+
+  blocks.forEach((block, i) => {
+    const meta = CHANNEL_ICONS[block.channel] || { icon: "📄", type: "Overig" };
+    // Strip markdown formatting for clean copyable text
+    const cleanContent = block.content
+      .replace(/^\*Aanpassingen:.*$/gm, "")  // Remove revision notes
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/\*(.+?)\*/g, "$1")
+      .trim();
+
+    const card = document.createElement("div");
+    card.className = "pub-card";
+    card.innerHTML = `
+      <div class="pub-card-header">
+        <div class="pub-channel-info">
+          <span class="pub-channel-icon">${meta.icon}</span>
+          <div>
+            <div class="pub-channel-name">${block.channel}</div>
+            <div class="pub-channel-type">${meta.type}</div>
+          </div>
+        </div>
+        <button class="pub-copy-btn" data-index="${i}">
+          📋 Kopiëren
+        </button>
+      </div>
+      <div class="pub-card-body">
+        <textarea class="pub-textarea" id="pub-text-${i}" spellcheck="true">${cleanContent}</textarea>
+        <div class="pub-char-count"><span id="pub-count-${i}">${cleanContent.length}</span> tekens</div>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    // Copy button handler
+    card.querySelector(".pub-copy-btn").addEventListener("click", (e) => {
+      const textarea = $(`#pub-text-${i}`);
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const btn = e.currentTarget;
+        btn.innerHTML = "✅ Gekopieerd!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = "📋 Kopiëren";
+          btn.classList.remove("copied");
+        }, 2000);
+      });
+    });
+
+    // Character count updater
+    card.querySelector(`#pub-text-${i}`).addEventListener("input", (e) => {
+      $(`#pub-count-${i}`).textContent = e.target.value.length;
+    });
+  });
+}
+
+function copyAllChannels() {
+  const textareas = $$("#pubGrid .pub-textarea");
+  const allText = textareas.map(ta => {
+    const card = ta.closest(".pub-card");
+    const name = card.querySelector(".pub-channel-name").textContent;
+    return `=== ${name} ===\n\n${ta.value}`;
+  }).join("\n\n---\n\n");
+
+  navigator.clipboard.writeText(allText).then(() => {
+    const btn = $("#btnCopyAll");
+    btn.textContent = "✅ Alles gekopieerd!";
+    setTimeout(() => { btn.textContent = "📋 Alles kopiëren"; }, 2000);
+  });
+}
+
+// ========================
 // Event Listeners
 // ========================
 $("#btnStart").addEventListener("click", runPipeline);
@@ -752,8 +895,22 @@ $("#btnNewCasus").addEventListener("click", () => {
 
 $("#btnRevision").addEventListener("click", runRevisionPipeline);
 $("#btnGenerateImages").addEventListener("click", runImageGeneration);
+$("#btnPublicatieklaar").addEventListener("click", showPublicatieklaar);
 $("#btnExportMd").addEventListener("click", exportMarkdown);
 $("#btnExportPdf").addEventListener("click", exportPdf);
+
+// Publicatieklaar buttons
+$("#btnBackToWarRoom").addEventListener("click", () => {
+  $("#stepPublicatie").classList.add("hidden");
+  $("#stepWarRoom").classList.remove("hidden");
+});
+$("#btnBackToWarRoom2").addEventListener("click", () => {
+  $("#stepPublicatie").classList.add("hidden");
+  $("#stepWarRoom").classList.remove("hidden");
+});
+$("#btnExportMd2").addEventListener("click", exportMarkdown);
+$("#btnExportPdf2").addEventListener("click", exportPdf);
+$("#btnCopyAll").addEventListener("click", copyAllChannels);
 
 // Template buttons
 $("#btnSaveTemplate").addEventListener("click", saveTemplate);
