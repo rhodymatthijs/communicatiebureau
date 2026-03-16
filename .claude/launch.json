@@ -1,0 +1,6 @@
+{
+  "command": "node server.js",
+  "workingDirectory": ".",
+  "autoPort": false,
+  "port": 3456
+}

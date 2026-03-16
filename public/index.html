@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Communicatiebureau AI</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>Communicatie<br>bureau</h1>
+        <span class="badge">AI</span>
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">Anthropic API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-ant-..." class="input">
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">OpenAI API Key (voor visuals)</label>
+        <input type="password" id="openaiKey" placeholder="sk-..." class="input">
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">Organisatie</label>
+        <input type="text" id="organisatie" placeholder="Naam organisatie" class="input">
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">Logo</label>
+        <div class="logo-upload" id="logoUpload">
+          <input type="file" id="logoFile" accept="image/*" hidden>
+          <div class="logo-preview" id="logoPreview">
+            <span class="logo-placeholder">+ Upload logo</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">Huisstijlkleuren</label>
+        <div class="color-row">
+          <div class="color-input">
+            <input type="color" id="colorPrimary" value="#1a365d">
+            <span>Primair</span>
+          </div>
+          <div class="color-input">
+            <input type="color" id="colorSecondary" value="#e53e3e">
+            <span>Secundair</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">Lettertype</label>
+        <input type="text" id="font" placeholder="bijv. Helvetica, Open Sans" class="input">
+      </div>
+
+      <div class="sidebar-section">
+        <label class="label">Tone of voice</label>
+        <select id="toneOfVoice" class="input">
+          <option value="professioneel en warm">Professioneel & warm</option>
+          <option value="formeel en zakelijk">Formeel & zakelijk</option>
+          <option value="informeel en toegankelijk">Informeel & toegankelijk</option>
+          <option value="inspirerend en visionair">Inspirerend & visionair</option>
+          <option value="nuchter en direct">Nuchter & direct</option>
+        </select>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <div class="sidebar-section">
+        <label class="label">Huisstijl Templates</label>
+        <div class="template-actions">
+          <button class="btn btn-small btn-secondary" id="btnSaveTemplate">Opslaan</button>
+          <select id="templateSelect" class="input">
+            <option value="">-- Kies template --</option>
+          </select>
+          <button class="btn btn-small btn-danger" id="btnDeleteTemplate">Verwijder</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+      <!-- Step 1: Casus input -->
+      <section class="step" id="stepCasus">
+        <div class="step-header">
+          <span class="step-number">1</span>
+          <h2>Beschrijf je casus</h2>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Titel</label>
+          <input type="text" id="casusTitel" placeholder="bijv. Fusie twee scholen" class="input input-lg">
+        </div>
+
+        <div class="form-group">
+          <label class="label">Beschrijving van de situatie</label>
+          <textarea id="casusBeschrijving" rows="5" placeholder="Beschrijf de communicatiecasus. Wat is er aan de hand? Wat wil je bereiken? Wat is de achtergrond?" class="input"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Extra context (optioneel)</label>
+          <textarea id="casusContext" rows="3" placeholder="Eventuele gevoeligheden, eerdere communicatie, politieke context..." class="input"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Urgentie / tijdlijn</label>
+          <input type="text" id="casusUrgentie" placeholder="bijv. Communicatie moet binnen 2 weken uit" class="input">
+        </div>
+
+        <div class="form-group">
+          <label class="label">Doelgroepen</label>
+          <div class="checkbox-inline">
+            <label class="checkbox"><input type="checkbox" value="Ouders/verzorgers" checked> Ouders/verzorgers</label>
+            <label class="checkbox"><input type="checkbox" value="Leerlingen"> Leerlingen</label>
+            <label class="checkbox"><input type="checkbox" value="Docenten/medewerkers" checked> Docenten/medewerkers</label>
+            <label class="checkbox"><input type="checkbox" value="Directie"> Directie</label>
+            <label class="checkbox"><input type="checkbox" value="Raad van Toezicht"> Raad van Toezicht</label>
+            <label class="checkbox"><input type="checkbox" value="Gemeente/overheid"> Gemeente/overheid</label>
+            <label class="checkbox"><input type="checkbox" value="Pers/media"> Pers/media</label>
+            <label class="checkbox"><input type="checkbox" value="Samenwerkingspartners"> Samenwerkingspartners</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Kanalen</label>
+          <div class="channel-grid">
+            <div class="channel-group">
+              <span class="checkbox-group-label">Digitaal</span>
+              <label class="checkbox"><input type="checkbox" value="Website" checked> Website</label>
+              <label class="checkbox"><input type="checkbox" value="Intern communicatieportaal"> Intern communicatieportaal</label>
+              <label class="checkbox"><input type="checkbox" value="Nieuwsbrief (e-mail)"> Nieuwsbrief (e-mail)</label>
+              <label class="checkbox"><input type="checkbox" value="Direct mailing"> Direct mailing</label>
+            </div>
+            <div class="channel-group">
+              <span class="checkbox-group-label">Social media</span>
+              <label class="checkbox"><input type="checkbox" value="Facebook"> Facebook</label>
+              <label class="checkbox"><input type="checkbox" value="Instagram"> Instagram</label>
+              <label class="checkbox"><input type="checkbox" value="LinkedIn"> LinkedIn</label>
+              <label class="checkbox"><input type="checkbox" value="X (Twitter)"> X (Twitter)</label>
+              <label class="checkbox"><input type="checkbox" value="TikTok"> TikTok</label>
+            </div>
+            <div class="channel-group">
+              <span class="checkbox-group-label">Traditioneel</span>
+              <label class="checkbox"><input type="checkbox" value="Brief aan ouders" checked> Brief aan ouders</label>
+              <label class="checkbox"><input type="checkbox" value="Persverklaring"> Persverklaring</label>
+              <label class="checkbox"><input type="checkbox" value="Interne memo"> Interne memo</label>
+              <label class="checkbox"><input type="checkbox" value="Poster/flyer"> Poster/flyer</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="label">Stakeholder-review door</label>
+          <div class="stakeholder-select-grid">
+            <label class="stakeholder-option">
+              <input type="checkbox" name="stakeholder" value="ouder" checked>
+              <div class="stakeholder-chip">
+                <img class="avatar-img avatar-sm" src="https://api.dicebear.com/9.x/avataaars/svg?seed=AnnemarieKuiper5&top=longHairStraight2&hairColor=2c1b18&facialHairProbability=0&skinColor=ffdbb4&clothing=collarAndSweater&clothingColor=22c55e&accessoriesProbability=0" alt="Annemarie">
+                <div>
+                  <strong>Annemarie Kuiper</strong>
+                  <span>43 jaar, twee kinderen op school, werkt parttime in de zorg, actief MR-lid</span>
+                </div>
+              </div>
+            </label>
+            <label class="stakeholder-option">
+              <input type="checkbox" name="stakeholder" value="leerling">
+              <div class="stakeholder-chip">
+                <img class="avatar-img avatar-sm" src="https://api.dicebear.com/9.x/avataaars/svg?seed=ThomasJansen4&top=shortRound&hairColor=2c1b18&facialHairProbability=0&skinColor=ffdbb4&clothing=hoodie&clothingColor=3b82f6&accessoriesProbability=0" alt="Thomas">
+                <div>
+                  <strong>Thomas Jansen</strong>
+                  <span>16 jaar, 4 havo, gamert graag, vindt school "oké", leest alleen z'n telefoon</span>
+                </div>
+              </div>
+            </label>
+            <label class="stakeholder-option">
+              <input type="checkbox" name="stakeholder" value="docent" checked>
+              <div class="stakeholder-chip">
+                <img class="avatar-img avatar-sm" src="https://api.dicebear.com/9.x/avataaars/svg?seed=LindaPeters6&top=longHairBob&hairColor=a55728&facialHairProbability=0&skinColor=ffdbb4&clothing=blazerAndShirt&clothingColor=f97316&accessoriesProbability=0" alt="Linda">
+                <div>
+                  <strong>Linda Peters</strong>
+                  <span>47 jaar, docent Nederlands, sectievoorzitter, pragmatisch en to-the-point</span>
+                </div>
+              </div>
+            </label>
+            <label class="stakeholder-option">
+              <input type="checkbox" name="stakeholder" value="directeur">
+              <div class="stakeholder-chip">
+                <img class="avatar-img avatar-sm" src="https://api.dicebear.com/9.x/avataaars/svg?seed=RobertVanDerHelm8&top=shortWaved&hairColor=4a312c&facialHair=beardMedium&facialHairColor=4a312c&skinColor=ffdbb4&clothing=blazerAndShirt&clothingColor=64748b&accessoriesProbability=0" alt="Robert">
+                <div>
+                  <strong>Robert van der Helm</strong>
+                  <span>54 jaar, rector, politiek bewust, denkt in scenario's, houdt van zeilen</span>
+                </div>
+              </div>
+            </label>
+            <label class="stakeholder-option">
+              <input type="checkbox" name="stakeholder" value="rvt">
+              <div class="stakeholder-chip">
+                <img class="avatar-img avatar-sm" src="https://api.dicebear.com/9.x/avataaars/svg?seed=ElisabethBrouwer9&top=longHairCurly&hairColor=c93305&facialHairProbability=0&skinColor=ffdbb4&clothing=blazerAndSweater&clothingColor=7c3aed&accessories=prescription01&accessoriesProbability=100" alt="Elisabeth">
+                <div>
+                  <strong>Elisabeth Brouwer</strong>
+                  <span>61 jaar, oud-bestuurder, governance-expert, scherp op risico's, leest alles</span>
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" id="btnStart">
+          Start het bureau
+          <span class="btn-arrow">&rarr;</span>
+        </button>
+      </section>
+
+      <!-- Step 2: War Room -->
+      <section class="step hidden" id="stepWarRoom">
+        <div class="step-header">
+          <span class="step-number">2</span>
+          <h2>War Room</h2>
+          <span class="subtitle" id="casusTitle"></span>
+        </div>
+
+        <!-- Team intro -->
+        <div class="team-bar">
+          <h3>Je team</h3>
+          <div class="team-avatars">
+            <div class="team-member" data-agent="strategist">
+              <img class="avatar-img" src="https://api.dicebear.com/9.x/avataaars/svg?seed=RhodyTest4&accessories=prescription02&accessoriesProbability=100&facialHair=beardLight&facialHairColor=2c1b18&hairColor=2c1b18&top=shortWaved&skinColor=ffdbb4&clothing=blazerAndShirt&clothingColor=3c4f76" alt="Rhody">
+              <span>Rhody</span>
+            </div>
+            <div class="team-member" data-agent="copywriter">
+              <img class="avatar-img" src="https://api.dicebear.com/9.x/avataaars/svg?seed=JoostBakker7&top=shortFlat&hairColor=b58143&facialHair=beardLight&facialHairColor=b58143&skinColor=ffdbb4&clothing=shirtCrewNeck&clothingColor=f59e0b&accessoriesProbability=0" alt="Joost">
+              <span>Joost</span>
+            </div>
+            <div class="team-member" data-agent="visualAdvisor">
+              <img class="avatar-img" src="https://api.dicebear.com/9.x/avataaars/svg?seed=SophieDeGroot3&top=longHairStraight&hairColor=4a312c&facialHairProbability=0&skinColor=ffdbb4&clothing=blazerAndSweater&clothingColor=ec4899&accessoriesProbability=0" alt="Sophie">
+              <span>Sophie</span>
+            </div>
+            <div class="team-member" data-agent="revision">
+              <img class="avatar-img avatar-dim" src="https://api.dicebear.com/9.x/avataaars/svg?seed=JoostBakker7&top=shortFlat&hairColor=b58143&facialHair=beardLight&facialHairColor=b58143&skinColor=ffdbb4&clothing=shirtCrewNeck&clothingColor=f59e0b&accessoriesProbability=0" alt="Joost">
+              <span>Joost</span>
+            </div>
+            <div class="team-separator"></div>
+            <div class="team-member" id="teamStakeholders">
+              <div class="avatar avatar-sm-group" style="background: var(--bg-input)">
+                <span class="avatar-count" id="stakeholderCount">2</span>
+              </div>
+              <span>Stakeholders</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pipeline">
+          <!-- Strategist -->
+          <div class="agent-card" id="card-strategist">
+            <div class="agent-header">
+              <img class="avatar-img avatar-lg" src="https://api.dicebear.com/9.x/avataaars/svg?seed=RhodyTest4&accessories=prescription02&accessoriesProbability=100&facialHair=beardLight&facialHairColor=2c1b18&hairColor=2c1b18&top=shortWaved&skinColor=ffdbb4&clothing=blazerAndShirt&clothingColor=3c4f76" alt="Rhody">
+              <div class="agent-identity">
+                <span class="agent-name">Rhody Matthijs</span>
+                <span class="agent-role">Strategisch communicatieadviseur — onderwijs, bestuur &amp; organisatieverandering</span>
+              </div>
+              <span class="agent-status status-waiting">Wacht...</span>
+            </div>
+            <div class="agent-bio">Denkt vanuit de bedoeling. Verbindt strategie aan uitvoering. Altijd op zoek naar de vraag achter de vraag.</div>
+            <div class="agent-output"></div>
+          </div>
+
+          <div class="pipeline-arrow">▼</div>
+
+          <!-- Copywriter & Visual parallel -->
+          <div class="pipeline-parallel">
+            <div class="agent-card" id="card-copywriter">
+              <div class="agent-header">
+                <img class="avatar-img avatar-lg" src="https://api.dicebear.com/9.x/avataaars/svg?seed=JoostBakker7&top=shortFlat&hairColor=b58143&facialHair=beardLight&facialHairColor=b58143&skinColor=ffdbb4&clothing=shirtCrewNeck&clothingColor=f59e0b&accessoriesProbability=0" alt="Joost">
+                <div class="agent-identity">
+                  <span class="agent-name">Joost Bakker</span>
+                  <span class="agent-role">Senior copywriter — 38 jaar, vader van twee, woont in Utrecht</span>
+                </div>
+                <span class="agent-status status-waiting">Wacht...</span>
+              </div>
+              <div class="agent-bio">Schrijft het liefst met muziek op. Gelooft dat elk complex verhaal in drie zinnen kan. Heeft een hekel aan jargon en een zwak voor goede koppen.</div>
+              <div class="agent-output"></div>
+            </div>
+
+            <div class="agent-card" id="card-visualAdvisor">
+              <div class="agent-header">
+                <img class="avatar-img avatar-lg" src="https://api.dicebear.com/9.x/avataaars/svg?seed=SophieDeGroot3&top=longHairStraight&hairColor=4a312c&facialHairProbability=0&skinColor=ffdbb4&clothing=blazerAndSweater&clothingColor=ec4899&accessoriesProbability=0" alt="Sophie">
+                <div class="agent-identity">
+                  <span class="agent-name">Sophie de Groot</span>
+                  <span class="agent-role">Creatief directeur — 34 jaar, studeerde aan de Rietveld, woont in Haarlem</span>
+                </div>
+                <span class="agent-status status-waiting">Wacht...</span>
+              </div>
+              <div class="agent-bio">Ziet de wereld in composities. Kan niet tegen clipart. Vindt dat goed design onzichtbaar is — het voelt gewoon juist.</div>
+              <div class="agent-output"></div>
+            </div>
+          </div>
+
+          <div class="pipeline-arrow">▼</div>
+
+          <!-- Stakeholder reviews -->
+          <div class="stakeholder-grid" id="stakeholderGrid">
+            <!-- Filled dynamically -->
+          </div>
+
+          <!-- Revision round -->
+          <div class="pipeline-arrow hidden" id="revisionArrow">▼</div>
+          <div class="agent-card hidden" id="card-revision">
+            <div class="agent-header">
+              <img class="avatar-img avatar-lg" src="https://api.dicebear.com/9.x/avataaars/svg?seed=JoostBakker7&top=shortFlat&hairColor=b58143&facialHair=beardLight&facialHairColor=b58143&skinColor=ffdbb4&clothing=shirtCrewNeck&clothingColor=f59e0b&accessoriesProbability=0" alt="Joost">
+              <div class="agent-identity">
+                <span class="agent-name">Joost Bakker</span>
+                <span class="agent-role">Revisieronde — verwerkt stakeholder-feedback tot definitieve teksten</span>
+              </div>
+              <span class="agent-status status-waiting">Wacht...</span>
+            </div>
+            <div class="agent-output"></div>
+          </div>
+
+          <!-- Generated images -->
+          <div class="pipeline-arrow hidden" id="imagesArrow">▼</div>
+          <div class="agent-card hidden" id="card-images">
+            <div class="agent-header">
+              <span class="agent-emoji">🖼️</span>
+              <span class="agent-name">Gegenereerde visuals</span>
+              <span class="agent-status status-waiting">Wacht...</span>
+            </div>
+            <div class="image-grid" id="imageGrid"></div>
+          </div>
+        </div>
+
+        <div class="actions hidden" id="actionsBar">
+          <button class="btn btn-secondary" id="btnNewCasus">Nieuwe casus</button>
+          <button class="btn btn-primary" id="btnRevision">Revisieronde starten</button>
+          <button class="btn btn-primary" id="btnGenerateImages">Visuals genereren</button>
+          <button class="btn btn-secondary" id="btnExportMd">Export Markdown</button>
+          <button class="btn btn-primary" id="btnExportPdf">Export PDF</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
