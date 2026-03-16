@@ -94,6 +94,13 @@
           <button class="btn btn-small btn-danger" id="btnDeleteTemplate">Verwijder</button>
         </div>
       </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section">
+        <button class="dark-mode-toggle" id="btnDarkMode">
+          <span class="dark-mode-icon" id="darkModeIcon">&#127769;</span>
+          <span id="darkModeLabel">Donkere modus</span>
+        </button>
+      </div>
     </aside>
 
     <!-- Main content -->
@@ -267,6 +274,13 @@
               </div>
             </label>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label class="checkbox" style="font-weight: 600;">
+            <input type="checkbox" id="doelgroepSplit"> Teksten per doelgroep differenti&euml;ren
+          </label>
+          <span style="font-size: 12px; color: var(--text-muted); margin-left: 24px;">Elke tekst wordt aangepast aan de specifieke doelgroep</span>
         </div>
 
         <div class="form-group">
@@ -486,6 +500,8 @@
         <div class="actions">
           <button class="btn btn-secondary" id="btnBackToWarRoom2">&larr; Terug</button>
           <button class="btn btn-primary" id="btnToCalendar">Contentkalender &rarr;</button>
+          <button class="btn btn-secondary" id="btnShareProject">&#128279; Delen voor review</button>
+          <button class="btn btn-secondary" id="btnAnalyzeTone">Toon checken</button>
           <button class="btn btn-secondary" id="btnExportMd2">Export MD</button>
           <button class="btn btn-secondary" id="btnExportPdf2">Export PDF</button>
           <button class="btn btn-accent" id="btnCopyAll">Alles kopieren</button>
@@ -542,6 +558,32 @@
         <div class="project-list" id="projectList">
           <!-- Filled dynamically -->
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tone Analysis Modal -->
+  <div class="modal-overlay" id="toneModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Tone-of-Voice Analyse</h3>
+        <button class="modal-close" id="btnCloseToneModal">&times;</button>
+      </div>
+      <div class="modal-body" id="toneResults">
+        <div class="empty-state"><p>Analyseren...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share Modal -->
+  <div class="modal-overlay" id="shareModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Project delen voor review</h3>
+        <button class="modal-close" id="btnCloseShareModal">&times;</button>
+      </div>
+      <div class="modal-body" id="shareContent">
+        <div class="empty-state"><p>Link genereren...</p></div>
       </div>
     </div>
   </div>

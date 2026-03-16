@@ -8,6 +8,8 @@ const state = {
   userFeedback: "",
   variantMode: false,
   crisisMode: false,
+  doelgroepSplit: false,
+  darkMode: localStorage.getItem("cb-dark-mode") === "true",
   currentStep: 1,
   results: { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] },
   calendarEvents: {},
@@ -536,6 +538,7 @@ async function runAgent(agentId, extras = {}) {
     huisstijl: getHuisstijl(),
     variantMode: state.variantMode && agentId === "copywriter",
     crisisMode: state.crisisMode,
+    doelgroepSplit: state.doelgroepSplit && agentId === "copywriter",
     ...extras,
   };
 
@@ -841,6 +844,7 @@ async function runPipeline() {
 
   state.variantMode = $("#variantMode")?.checked || false;
   state.crisisMode = $("#crisisMode")?.checked || false;
+  state.doelgroepSplit = $("#doelgroepSplit")?.checked || false;
 
   const casus = getCasus();
   if (!casus.beschrijving) return alert("Beschrijf de casus voordat je het bureau start");
@@ -1515,8 +1519,16 @@ function showPublicatieklaar() {
         <div class="pub-card-meta">
           ${readLabel ? `<span class="readability-badge level-${readLabel.level}">${readLabel.label} (${readability.score})</span>` : ""}
           <span class="pub-char-count" id="pub-count-${i}">${formatCharCount(mainContent.length, block.channel)}</span>
+          <div class="translate-controls">
+            <select class="translate-select" id="translate-lang-${i}">
+              <option value="">Vertaal naar...</option>
+              ${LANGUAGES.map(l => `<option value="${l.label}">${l.label}</option>`).join("")}
+            </select>
+            <button class="btn btn-small btn-secondary" id="translate-btn-${i}">Vertalen</button>
+          </div>
         </div>
         ${hasPreview ? `<div class="social-preview-container hidden" id="preview-${i}">${socialPreviewHtml}</div>` : ""}
+        <div class="translation-container hidden" id="translation-${i}"></div>
       </div>
     `;
     grid.appendChild(card);
@@ -1551,6 +1563,17 @@ function showPublicatieklaar() {
           }
           card.querySelector(`#pub-count-${i}`).innerHTML = formatCharCount(visible.value.length, block.channel);
         });
+      });
+    }
+
+    // Translate button
+    const translateBtn = card.querySelector(`#translate-btn-${i}`);
+    if (translateBtn) {
+      translateBtn.addEventListener("click", () => {
+        const lang = card.querySelector(`#translate-lang-${i}`).value;
+        if (!lang) return alert("Kies eerst een taal");
+        const visibleTA = card.querySelector(".pub-textarea:not(.hidden)");
+        translateChannel(i, block.channel, visibleTA.value, lang);
       });
     }
 
@@ -2048,6 +2071,195 @@ function exportCalendar() {
 }
 
 // ========================
+// Dark Mode
+// ========================
+function applyDarkMode(dark) {
+  state.darkMode = dark;
+  document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+  localStorage.setItem("cb-dark-mode", dark);
+  const icon = $("#darkModeIcon");
+  const label = $("#darkModeLabel");
+  if (icon) icon.textContent = dark ? "\u2600\uFE0F" : "\uD83C\uDF19";
+  if (label) label.textContent = dark ? "Lichte modus" : "Donkere modus";
+}
+
+// Init dark mode from localStorage
+applyDarkMode(state.darkMode);
+
+// ========================
+// Tone-of-Voice Analyzer
+// ========================
+async function analyzeTone() {
+  const sourceText = state.results.revision || state.results.teksten;
+  if (!sourceText) return alert("Er zijn nog geen teksten om te analyseren");
+
+  const blocks = parseChannelBlocks(sourceText);
+  if (blocks.length === 0) return alert("Geen kanaalblokken gevonden");
+
+  const toneOfVoice = getHuisstijl().toneOfVoice || "professioneel en warm";
+
+  // Open modal
+  $("#toneModal").classList.add("visible");
+  $("#toneResults").innerHTML = '<div class="empty-state"><p>Teksten analyseren op tone-of-voice...</p></div>';
+
+  const results = [];
+  for (const block of blocks) {
+    const cleanedText = cleanContent(block.content);
+    if (cleanedText.length < 20) continue;
+
+    try {
+      const res = await fetch("/api/analyze-tone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: state.apiKey,
+          text: cleanedText.substring(0, 2000),
+          expectedTone: toneOfVoice,
+        }),
+      });
+      if (!res.ok) throw new Error("Analyse mislukt");
+      const data = await res.json();
+      results.push({ channel: block.channel, ...data });
+    } catch (err) {
+      results.push({ channel: block.channel, score: 0, match: "fout", analyse: err.message, suggesties: [] });
+    }
+  }
+
+  // Render results
+  const avgScore = results.length > 0 ? Math.round(results.reduce((s, r) => s + (r.score || 0), 0) / results.length) : 0;
+  const overallMatch = avgScore >= 8 ? "goed" : avgScore >= 5 ? "redelijk" : "slecht";
+
+  $("#toneResults").innerHTML = `
+    <div class="tone-overall">
+      <div class="tone-overall-score tone-${overallMatch}">${avgScore}/10</div>
+      <div>
+        <strong>Gewenste toon: ${toneOfVoice}</strong>
+        <div class="tone-overall-label">Gemiddelde match: ${overallMatch}</div>
+      </div>
+    </div>
+    ${results.map(r => `
+      <div class="tone-result">
+        <div class="tone-result-header">
+          <span class="tone-result-channel">${r.channel}</span>
+          <span class="tone-score tone-${r.match || 'redelijk'}">${r.score || "?"}/10</span>
+        </div>
+        <p class="tone-analyse">${r.analyse || ""}</p>
+        ${r.suggesties?.length ? `<div class="tone-suggesties"><strong>Suggesties:</strong><ul>${r.suggesties.map(s => `<li>${s}</li>`).join("")}</ul></div>` : ""}
+      </div>
+    `).join("")}
+  `;
+}
+
+// ========================
+// Translation
+// ========================
+const LANGUAGES = [
+  { code: "en", label: "Engels" },
+  { code: "ar", label: "Arabisch" },
+  { code: "tr", label: "Turks" },
+  { code: "de", label: "Duits" },
+  { code: "fr", label: "Frans" },
+  { code: "pl", label: "Pools" },
+];
+
+async function translateChannel(index, channel, text, targetLang) {
+  const btn = $(`#translate-btn-${index}`);
+  if (btn) { btn.disabled = true; btn.textContent = "Vertalen..."; }
+
+  try {
+    const res = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        apiKey: state.apiKey,
+        text,
+        targetLanguage: targetLang,
+        toneOfVoice: getHuisstijl().toneOfVoice,
+      }),
+    });
+    if (!res.ok) throw new Error("Vertaling mislukt");
+    const data = await res.json();
+
+    // Show translation below the textarea
+    const container = $(`#translation-${index}`);
+    if (container) {
+      container.classList.remove("hidden");
+      container.innerHTML = `
+        <div class="translation-header">
+          <strong>Vertaling (${targetLang})</strong>
+          <button class="btn btn-small btn-secondary" onclick="(() => {
+            navigator.clipboard.writeText(document.querySelector('#translation-text-${index}').textContent);
+            this.textContent = 'Gekopieerd!';
+            setTimeout(() => this.textContent = 'Kopieren', 2000);
+          })()">Kopieren</button>
+        </div>
+        <div class="translation-text" id="translation-text-${index}">${data.result}</div>
+      `;
+    }
+  } catch (err) {
+    alert("Vertaling mislukt: " + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "Vertalen"; }
+  }
+}
+
+// ========================
+// Share for Review
+// ========================
+async function shareProject() {
+  const sourceText = state.results.revision || state.results.teksten;
+  if (!sourceText) return alert("Er zijn nog geen teksten om te delen");
+
+  const modal = $("#shareModal");
+  modal.classList.add("visible");
+  $("#shareContent").innerHTML = '<div class="empty-state"><p>Link genereren...</p></div>';
+
+  try {
+    const projectData = {
+      casus: getCasus(),
+      huisstijl: getHuisstijl(),
+      results: {
+        plan: state.results.plan,
+        teksten: state.results.teksten,
+        revision: state.results.revision,
+      },
+    };
+
+    const res = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectData }),
+    });
+
+    if (!res.ok) throw new Error("Delen mislukt");
+    const data = await res.json();
+    const fullUrl = `${window.location.origin}${data.url}`;
+
+    $("#shareContent").innerHTML = `
+      <div class="share-success">
+        <div class="share-icon">&#128279;</div>
+        <h4>Review-link aangemaakt!</h4>
+        <p>Deel deze link met collega's. Zij kunnen de teksten bekijken en per kanaal feedback achterlaten — zonder API key.</p>
+        <div class="share-url-row">
+          <input class="input" id="shareUrl" value="${fullUrl}" readonly>
+          <button class="btn btn-primary" id="btnCopyShareUrl">Kopieren</button>
+        </div>
+        <p class="share-note">Let op: de link werkt zolang de server draait.</p>
+      </div>
+    `;
+
+    $("#btnCopyShareUrl").addEventListener("click", () => {
+      navigator.clipboard.writeText(fullUrl);
+      const btn = $("#btnCopyShareUrl");
+      btn.textContent = "Gekopieerd!";
+      setTimeout(() => { btn.textContent = "Kopieren"; }, 2000);
+    });
+  } catch (err) {
+    $("#shareContent").innerHTML = `<div class="empty-state"><p style="color: var(--error)">Fout: ${err.message}</p></div>`;
+  }
+}
+
+// ========================
 // Event Listeners
 // ========================
 $("#btnStart").addEventListener("click", runPipeline);
@@ -2204,6 +2416,19 @@ $("#btnDismissAutosave")?.addEventListener("click", dismissAutosave);
 $("#btnSaveTemplate").addEventListener("click", saveTemplate);
 $("#templateSelect").addEventListener("change", (e) => loadTemplate(e.target.value));
 $("#btnDeleteTemplate").addEventListener("click", deleteTemplate);
+
+// Dark mode toggle
+$("#btnDarkMode")?.addEventListener("click", () => applyDarkMode(!state.darkMode));
+
+// Tone analyzer
+$("#btnAnalyzeTone")?.addEventListener("click", analyzeTone);
+$("#btnCloseToneModal")?.addEventListener("click", () => $("#toneModal").classList.remove("visible"));
+$("#toneModal")?.addEventListener("click", (e) => { if (e.target === $("#toneModal")) $("#toneModal").classList.remove("visible"); });
+
+// Share
+$("#btnShareProject")?.addEventListener("click", shareProject);
+$("#btnCloseShareModal")?.addEventListener("click", () => $("#shareModal").classList.remove("visible"));
+$("#shareModal")?.addEventListener("click", (e) => { if (e.target === $("#shareModal")) $("#shareModal").classList.remove("visible"); });
 
 // Check server-side API keys
 (async () => {

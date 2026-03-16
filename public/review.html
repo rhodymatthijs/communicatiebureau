@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Review — Communicatiebureau AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #f7f8fc; --bg-card: #ffffff; --text: #1e1e2e; --text-muted: #64748b;
+      --accent: #6366f1; --border: #e2e4ef; --success: #10b981; --error: #ef4444;
+      --radius: 12px; --shadow: 0 4px 12px rgba(0,0,0,0.07);
+    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); }
+    .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .header .meta { color: var(--text-muted); font-size: 14px; margin-top: 8px; }
+    .badge { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-size: 10px;
+      font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; }
+    .channel-card { background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 24px; overflow: hidden; box-shadow: var(--shadow); }
+    .channel-header { padding: 16px 24px; background: linear-gradient(135deg, #f0f0ff, #faf0ff);
+      border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .channel-name { font-weight: 700; font-size: 16px; }
+    .channel-type { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+    .channel-body { padding: 24px; }
+    .channel-text { font-size: 14px; line-height: 1.75; color: #374151; white-space: pre-wrap; }
+    .feedback-form { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 16px; }
+    .feedback-form h4 { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+    .feedback-row { display: flex; gap: 8px; }
+    .feedback-input { flex: 1; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-family: inherit; font-size: 14px; resize: none; }
+    .feedback-input:focus { outline: none; border-color: var(--accent); }
+    .feedback-btn { padding: 10px 20px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;
+      border: none; border-radius: 8px; font-family: inherit; font-weight: 600; cursor: pointer;
+      font-size: 13px; white-space: nowrap; }
+    .feedback-btn:hover { transform: translateY(-1px); }
+    .feedback-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .feedback-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .feedback-item { background: #f1f3f9; padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+    .feedback-item strong { color: var(--accent); }
+    .feedback-item .date { color: var(--text-muted); font-size: 11px; }
+    .name-bar { background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius);
+      padding: 16px 24px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+    .name-bar label { font-size: 13px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+    .name-input { flex: 1; padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+      font-family: inherit; font-size: 14px; }
+    .name-input:focus { outline: none; border-color: var(--accent); }
+    .loading { text-align: center; padding: 80px 20px; color: var(--text-muted); font-size: 16px; }
+    .error { text-align: center; padding: 80px 20px; color: var(--error); font-size: 16px; }
+    .sent { color: var(--success); font-size: 13px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <div class="loading" id="loading">Project laden...</div>
+  </div>
+  <script>
+    const shareId = window.location.pathname.split("/").pop();
+    let reviewerName = localStorage.getItem("cb-reviewer-name") || "";
+    let projectData = null;
+
+    async function loadProject() {
+      try {
+        const res = await fetch(`/api/share/${shareId}`);
+        if (!res.ok) throw new Error("Niet gevonden");
+        const data = await res.json();
+        projectData = data;
+        renderProject(data);
+      } catch (err) {
+        document.getElementById("loading").className = "error";
+        document.getElementById("loading").textContent = "Dit project bestaat niet of is verlopen.";
+      }
+    }
+
+    function parseChannelBlocks(text) {
+      const blocks = [];
+      const regex = /##\s*\[KANAAL:\s*([^\]]+)\]\s*\n([\s\S]*?)(?=##\s*\[KANAAL:|$)/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        blocks.push({ channel: match[1].trim(), content: match[2].trim() });
+      }
+      if (blocks.length === 0) {
+        const fallback = /##\s+(.+?)\s*\n([\s\S]*?)(?=##\s+|$)/g;
+        while ((match = fallback.exec(text)) !== null) {
+          const name = match[1].trim().replace(/^\*\*|\*\*$/g, "");
+          if (name.length < 60) blocks.push({ channel: name, content: match[2].trim() });
+        }
+      }
+      return blocks;
+    }
+
+    function cleanText(text) {
+      return text.replace(/^\*Aanpassingen:.*$/gm, "").replace(/###\s*Variant [AB]\s*\n?/g, "")
+        .replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").trim();
+    }
+
+    function renderProject(data) {
+      const app = document.getElementById("app");
+      const project = data.project;
+      const teksten = project.results?.revision || project.results?.teksten || "";
+      const blocks = parseChannelBlocks(teksten);
+
+      const feedbackByChannel = {};
+      (data.feedback || []).forEach(f => {
+        if (!feedbackByChannel[f.channel]) feedbackByChannel[f.channel] = [];
+        feedbackByChannel[f.channel].push(f);
+      });
+
+      app.innerHTML = `
+        <div class="header">
+          <h1>${project.casus?.titel || "Communicatieplan"}</h1>
+          <div class="meta">${project.huisstijl?.organisatie || ""} &bull; Review-modus <span class="badge">AI</span></div>
+        </div>
+        <div class="name-bar">
+          <label>Jouw naam:</label>
+          <input class="name-input" id="reviewerName" placeholder="Naam voor bij je feedback" value="${reviewerName}">
+        </div>
+        ${blocks.map((b, i) => `
+          <div class="channel-card">
+            <div class="channel-header">
+              <div>
+                <div class="channel-name">${b.channel}</div>
+              </div>
+            </div>
+            <div class="channel-body">
+              <div class="channel-text">${cleanText(b.content)}</div>
+              <div class="feedback-form">
+                <h4>Feedback op deze tekst</h4>
+                <div class="feedback-row">
+                  <textarea class="feedback-input" id="fb-${i}" rows="2" placeholder="Schrijf hier je feedback..."></textarea>
+                  <button class="feedback-btn" onclick="sendFeedback(${i}, '${b.channel.replace(/'/g, "\\'")}')">Verstuur</button>
+                </div>
+                <div class="feedback-list" id="fb-list-${i}">
+                  ${(feedbackByChannel[b.channel] || []).map(f => `
+                    <div class="feedback-item">
+                      <strong>${f.naam}</strong>: ${f.tekst}
+                      <span class="date">${new Date(f.datum).toLocaleString("nl-NL")}</span>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join("")}
+      `;
+
+      document.getElementById("reviewerName").addEventListener("input", (e) => {
+        reviewerName = e.target.value;
+        localStorage.setItem("cb-reviewer-name", reviewerName);
+      });
+    }
+
+    async function sendFeedback(index, channel) {
+      const textarea = document.getElementById(`fb-${index}`);
+      const text = textarea.value.trim();
+      if (!text) return;
+
+      const naam = document.getElementById("reviewerName").value.trim() || "Anoniem";
+      const btn = textarea.parentElement.querySelector(".feedback-btn");
+      btn.disabled = true;
+      btn.textContent = "Versturen...";
+
+      try {
+        const res = await fetch(`/api/share/${shareId}/feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ naam, tekst: text, channel }),
+        });
+        if (!res.ok) throw new Error("Fout");
+
+        const list = document.getElementById(`fb-list-${index}`);
+        list.innerHTML += `<div class="feedback-item"><strong>${naam}</strong>: ${text} <span class="date">Zojuist</span></div>`;
+        textarea.value = "";
+        btn.textContent = "Verstuurd!";
+        btn.classList.add("sent");
+        setTimeout(() => { btn.textContent = "Verstuur"; btn.disabled = false; }, 2000);
+      } catch {
+        btn.textContent = "Fout — probeer opnieuw";
+        btn.disabled = false;
+      }
+    }
+
+    loadProject();
+  </script>
+</body>
+</html>

@@ -3,13 +3,18 @@ dotenv.config({ override: true });
 import Anthropic from "@anthropic-ai/sdk";
 import express from "express";
 import multer from "multer";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const upload = multer({ dest: "uploads/" });
+
+// Ensure shares directory exists
+const sharesDir = join(__dirname, "shares");
+if (!existsSync(sharesDir)) mkdirSync(sharesDir);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.static(join(__dirname, "public")));
@@ -169,7 +174,7 @@ Wees formeel, afgewogen en scherp op risico's. Eerste persoon als RvT-lid.`,
 
 // API endpoint: run agent
 app.post("/api/run-agent", async (req, res) => {
-  const { apiKey: bodyKey, agentId, casus, huisstijl, plan, teksten, variantMode, crisisMode } = req.body;
+  const { apiKey: bodyKey, agentId, casus, huisstijl, plan, teksten, variantMode, crisisMode, doelgroepSplit } = req.body;
   const apiKey = bodyKey || process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) return res.status(400).json({ error: "API key is vereist" });
@@ -249,6 +254,23 @@ app.post("/api/run-agent", async (req, res) => {
 - Geen stock-foto's met lachende mensen
 - Overweeg of een visual überhaupt gepast is per kanaal
 - Bij twijfel: alleen tekst, geen beeld`;
+  }
+
+  if (doelgroepSplit && agentId === "copywriter" && casus.doelgroepen?.length > 1) {
+    systemPrompt += `\n\nDOELGROEP-DIFFERENTIATIE ACTIEF:
+Per kanaal: schrijf de tekst specifiek afgestemd op de hoofddoelgroep van dat kanaal.
+De doelgroepen zijn: ${casus.doelgroepen.join(", ")}.
+
+Pas per kanaal de volgende elementen aan:
+- **Taalgebruik**: formeler voor bestuur/RvT, toegankelijker voor ouders, casual voor leerlingen
+- **Informatiedichtheid**: meer detail voor professionals, kernpunten voor ouders/leerlingen
+- **Aanspreking**: passend bij de doelgroep (u/je/jullie)
+- **Focus**: wat deze doelgroep specifiek wil weten
+
+Geef bovenaan elk kanaalblok aan voor welke doelgroep het primair geschreven is:
+## [KANAAL: Kanaalnaam]
+*Primaire doelgroep: [doelgroep]*
+Tekst hier...`;
   }
 
   if (variantMode && agentId === "copywriter") {
@@ -436,6 +458,123 @@ app.post("/api/upload-logo", upload.single("logo"), (req, res) => {
     url: `data:${mimeType};base64,${base64}`,
     filename: req.file.originalname,
   });
+});
+
+// API endpoint: analyze tone-of-voice
+app.post("/api/analyze-tone", async (req, res) => {
+  const { apiKey: bodyKey4, text, expectedTone } = req.body;
+  const apiKey = bodyKey4 || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: "API key is vereist" });
+
+  const systemPrompt = `Je bent een communicatie-expert die teksten analyseert op tone-of-voice.
+Je krijgt een tekst en de GEWENSTE tone-of-voice. Analyseer of de tekst matcht.
+
+Geef je analyse in exact dit JSON-format (en NIETS anders):
+{
+  "score": <getal 1-10>,
+  "match": "<goed|redelijk|slecht>",
+  "analyse": "<2-3 zinnen over hoe de toon overkomt>",
+  "suggesties": ["<suggestie 1>", "<suggestie 2>"]
+}
+
+Score 8-10 = goed, 5-7 = redelijk, 1-4 = slecht.
+Antwoord ALLEEN met het JSON-object, geen markdown of toelichting.`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: `**Gewenste tone-of-voice:** ${expectedTone}\n\n**Tekst om te analyseren:**\n${text}` }],
+    });
+    const result = message.content.filter(b => b.type === "text").map(b => b.text).join("");
+    try {
+      const parsed = JSON.parse(result);
+      res.json(parsed);
+    } catch {
+      res.json({ score: 5, match: "redelijk", analyse: result, suggesties: [] });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API endpoint: translate text
+app.post("/api/translate", async (req, res) => {
+  const { apiKey: bodyKey5, text, targetLanguage, toneOfVoice } = req.body;
+  const apiKey = bodyKey5 || process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: "API key is vereist" });
+
+  const systemPrompt = `Je bent een professionele vertaler gespecialiseerd in communicatieteksten voor onderwijsorganisaties.
+Vertaal de gegeven tekst naar ${targetLanguage}.
+
+Regels:
+- Behoud de tone-of-voice: ${toneOfVoice || "professioneel en warm"}
+- Behoud de structuur en opmaak van de originele tekst
+- Pas culturele referenties aan waar nodig
+- Gebruik formele aanspreekvorm tenzij de toon informeel is
+- Lever ALLEEN de vertaalde tekst, geen toelichting of inleiding`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const message = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: "user", content: text }],
+    });
+    const result = message.content.filter(b => b.type === "text").map(b => b.text).join("");
+    res.json({ result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API endpoint: create share link
+app.post("/api/share", (req, res) => {
+  const { projectData } = req.body;
+  if (!projectData) return res.status(400).json({ error: "Geen projectdata" });
+
+  const id = randomUUID().substring(0, 8);
+  const shareData = {
+    id,
+    created: Date.now(),
+    project: projectData,
+    feedback: [],
+  };
+
+  writeFileSync(join(sharesDir, `${id}.json`), JSON.stringify(shareData, null, 2));
+  res.json({ id, url: `/review/${id}` });
+});
+
+// API endpoint: get shared project
+app.get("/api/share/:id", (req, res) => {
+  const filePath = join(sharesDir, `${req.params.id}.json`);
+  if (!existsSync(filePath)) return res.status(404).json({ error: "Niet gevonden" });
+  const data = JSON.parse(readFileSync(filePath, "utf-8"));
+  res.json(data);
+});
+
+// API endpoint: add feedback to shared project
+app.post("/api/share/:id/feedback", (req, res) => {
+  const filePath = join(sharesDir, `${req.params.id}.json`);
+  if (!existsSync(filePath)) return res.status(404).json({ error: "Niet gevonden" });
+
+  const data = JSON.parse(readFileSync(filePath, "utf-8"));
+  data.feedback.push({
+    naam: req.body.naam || "Anoniem",
+    tekst: req.body.tekst || "",
+    datum: new Date().toISOString(),
+    channel: req.body.channel || "",
+  });
+  writeFileSync(filePath, JSON.stringify(data, null, 2));
+  res.json({ ok: true, feedbackCount: data.feedback.length });
+});
+
+// Serve review page (shared project view)
+app.get("/review/:id", (req, res) => {
+  res.sendFile(join(__dirname, "public", "review.html"));
 });
 
 // Check welke API keys server-side beschikbaar zijn
