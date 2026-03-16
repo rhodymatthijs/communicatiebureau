@@ -7,6 +7,7 @@ const state = {
   revisionRound: 0,
   userFeedback: "",
   variantMode: false,
+  crisisMode: false,
   currentStep: 1,
   results: { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] },
   calendarEvents: {},
@@ -534,6 +535,7 @@ async function runAgent(agentId, extras = {}) {
     casus: getCasus(),
     huisstijl: getHuisstijl(),
     variantMode: state.variantMode && agentId === "copywriter",
+    crisisMode: state.crisisMode,
     ...extras,
   };
 
@@ -838,9 +840,17 @@ async function runPipeline() {
   if (!state.apiKey && !state.serverHasAnthropicKey) return alert("Vul je Anthropic API key in");
 
   state.variantMode = $("#variantMode")?.checked || false;
+  state.crisisMode = $("#crisisMode")?.checked || false;
 
   const casus = getCasus();
   if (!casus.beschrijving) return alert("Beschrijf de casus voordat je het bureau start");
+
+  // In crisis mode, ensure Persverklaring is included
+  if (state.crisisMode) {
+    if (!casus.kanalen.includes("Persverklaring")) {
+      casus.kanalen.push("Persverklaring");
+    }
+  }
 
   const stakeholders = getSelectedStakeholders();
 
@@ -920,6 +930,17 @@ async function runPipeline() {
   // Show actions
   $("#actionsBar").classList.remove("hidden");
   $("#userFeedbackSection").classList.remove("hidden");
+
+  // Show crisis checklist if in crisis mode
+  const crisisChecklist = $("#crisisChecklist");
+  if (crisisChecklist) {
+    if (state.crisisMode) {
+      crisisChecklist.classList.remove("hidden");
+    } else {
+      crisisChecklist.classList.add("hidden");
+    }
+  }
+
   triggerAutosave();
 }
 
@@ -971,8 +992,17 @@ function exportMarkdown() {
 }
 
 // ========================
-// Export: PDF
+// Export: PDF (Branded)
 // ========================
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16),
+  } : { r: 30, g: 30, b: 46 };
+}
+
 function exportPdf() {
   const { jsPDF } = window.jspdf;
   if (!jsPDF) return alert("PDF library niet geladen");
@@ -981,41 +1011,90 @@ function exportPdf() {
   const casus = getCasus();
   const huisstijl = getHuisstijl();
   const pageWidth = 210;
+  const pageHeight = 297;
   const margin = 20;
   const contentWidth = pageWidth - 2 * margin;
   let y = 20;
 
+  // Brand colors
+  const primary = hexToRgb(huisstijl.primair || "#1a365d");
+  const secondary = hexToRgb(huisstijl.secundair || "#e53e3e");
+  const orgName = huisstijl.organisatie || "";
+
+  // Add branded header bar on each page
+  function addPageHeader() {
+    // Top color bar
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.rect(0, 0, pageWidth, 8, "F");
+    // Accent stripe
+    doc.setFillColor(secondary.r, secondary.g, secondary.b);
+    doc.rect(0, 8, pageWidth, 1.5, "F");
+  }
+
+  // Add branded footer on each page
+  function addPageFooter(pageNum) {
+    // Footer line
+    doc.setDrawColor(primary.r, primary.g, primary.b);
+    doc.setLineWidth(0.5);
+    doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+    // Footer text
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(120, 120, 120);
+    doc.text(orgName || "Communicatiebureau AI", margin, pageHeight - 10);
+    doc.text(`${new Date().toLocaleDateString("nl-NL")}`, pageWidth / 2, pageHeight - 10, { align: "center" });
+    doc.text(`Pagina ${pageNum}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+    doc.setTextColor(0, 0, 0);
+  }
+
+  let pageNum = 1;
+
   function checkPage(needed = 20) {
-    if (y + needed > 280) {
+    if (y + needed > pageHeight - 25) {
+      addPageFooter(pageNum);
       doc.addPage();
-      y = 20;
+      pageNum++;
+      addPageHeader();
+      y = 16;
     }
   }
 
   function addTitle(text) {
-    checkPage(15);
-    doc.setFontSize(18);
+    checkPage(18);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text(text, margin, y);
-    y += 10;
+    doc.setTextColor(primary.r, primary.g, primary.b);
+    const lines = doc.splitTextToSize(text, contentWidth);
+    for (const line of lines) {
+      doc.text(line, margin, y);
+      y += 9;
+    }
+    y += 2;
+    doc.setTextColor(0, 0, 0);
   }
 
   function addSubtitle(text) {
-    checkPage(12);
-    doc.setFontSize(13);
+    checkPage(14);
+    // Colored accent block
+    doc.setFillColor(primary.r, primary.g, primary.b);
+    doc.roundedRect(margin, y - 5, 3, 10, 1, 1, "F");
+    doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text(text, margin, y);
-    y += 8;
+    doc.setTextColor(primary.r, primary.g, primary.b);
+    doc.text(text, margin + 7, y + 1);
+    y += 10;
+    doc.setTextColor(0, 0, 0);
   }
 
   function addBody(text) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(50, 50, 50);
     const clean = text
       .replace(/\*\*(.+?)\*\*/g, "$1")
       .replace(/\*(.+?)\*/g, "$1")
       .replace(/^#+\s*/gm, "")
-      .replace(/^[-*]\s/gm, "  - ");
+      .replace(/^[-*]\s/gm, "  \u2022 ");
 
     const lines = doc.splitTextToSize(clean, contentWidth);
     for (const line of lines) {
@@ -1024,25 +1103,84 @@ function exportPdf() {
       y += 5;
     }
     y += 4;
+    doc.setTextColor(0, 0, 0);
   }
 
   function addSeparator() {
-    checkPage(10);
-    doc.setDrawColor(200);
+    checkPage(12);
+    y += 2;
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.3);
     doc.line(margin, y, pageWidth - margin, y);
     y += 8;
   }
 
-  // Header
-  addTitle(`Communicatieplan: ${casus.titel || "Casus"}`);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(`Organisatie: ${huisstijl.organisatie || "\u2014"}`, margin, y);
-  y += 5;
-  doc.text(`Datum: ${new Date().toLocaleDateString("nl-NL")}`, margin, y);
+  // === PAGE 1: Cover page ===
+  addPageHeader();
+
+  // Logo
+  if (state.logoUrl && state.logoUrl.startsWith("data:image")) {
+    try {
+      doc.addImage(state.logoUrl, "PNG", margin, 18, 40, 20, undefined, "FAST");
+      y = 44;
+    } catch {
+      y = 18;
+    }
+  } else {
+    y = 18;
+  }
+
+  // Title block with colored background
   y += 10;
+  doc.setFillColor(primary.r, primary.g, primary.b);
+  doc.roundedRect(margin, y - 2, contentWidth, 28, 3, 3, "F");
+  doc.setFontSize(22);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  const titleLines = doc.splitTextToSize(casus.titel || "Communicatieplan", contentWidth - 16);
+  titleLines.forEach((line, i) => {
+    doc.text(line, margin + 8, y + 10 + (i * 10));
+  });
+  y += 32;
+
+  // Meta info
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  if (orgName) {
+    doc.text(`Organisatie: ${orgName}`, margin, y);
+    y += 6;
+  }
+  doc.text(`Datum: ${new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })}`, margin, y);
+  y += 6;
+  if (casus.doelgroepen?.length) {
+    doc.text(`Doelgroepen: ${casus.doelgroepen.join(", ")}`, margin, y);
+    y += 6;
+  }
+  if (casus.kanalen?.length) {
+    const kanalLines = doc.splitTextToSize(`Kanalen: ${casus.kanalen.join(", ")}`, contentWidth);
+    kanalLines.forEach(line => {
+      doc.text(line, margin, y);
+      y += 5;
+    });
+    y += 1;
+  }
+  y += 6;
   addSeparator();
 
+  // Accent info box
+  doc.setFillColor(Math.min(primary.r + 200, 245), Math.min(primary.g + 200, 245), Math.min(primary.b + 200, 245));
+  doc.roundedRect(margin, y - 2, contentWidth, 16, 2, 2, "F");
+  doc.setFontSize(9);
+  doc.setTextColor(primary.r, primary.g, primary.b);
+  doc.setFont("helvetica", "bold");
+  doc.text("Gegenereerd door Communicatiebureau AI", margin + 5, y + 5);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Huisstijl: ${huisstijl.primair} / ${huisstijl.secundair}  |  Toon: ${huisstijl.toneOfVoice}`, margin + 5, y + 10);
+  doc.setTextColor(0, 0, 0);
+  y += 22;
+
+  // === Content pages ===
   addSubtitle("Casus");
   addBody(casus.beschrijving);
   addSeparator();
@@ -1088,6 +1226,9 @@ function exportPdf() {
     const calText = sorted.map(([date, channels]) => `${date}: ${channels.join(", ")}`).join("\n");
     addBody(calText);
   }
+
+  // Add footer to last page
+  addPageFooter(pageNum);
 
   doc.save(`communicatieplan-${casus.titel?.replace(/\s+/g, "-").toLowerCase() || "export"}.pdf`);
 }
@@ -1174,6 +1315,142 @@ function formatCharCount(length, channel) {
   return `<span class="char-limit-ok">${length} / ${limit} tekens</span>`;
 }
 
+// ========================
+// Social Media Previews
+// ========================
+const SOCIAL_PLATFORMS = {
+  "Instagram": {
+    maxPreview: 125,
+    bgColor: "#fafafa",
+    headerColor: "#262626",
+    font: "14px -apple-system, sans-serif",
+    render: (text, orgName, logoUrl) => {
+      const truncated = text.length > 125 ? text.substring(0, 125) + "... meer" : text;
+      return `
+        <div class="social-preview social-preview-instagram">
+          <div class="social-preview-header">
+            <div class="social-preview-avatar">${logoUrl ? `<img src="${logoUrl}" alt="">` : `<span>${(orgName || "O")[0]}</span>`}</div>
+            <div class="social-preview-username">${orgName?.toLowerCase().replace(/\s+/g, "") || "organisatie"}</div>
+          </div>
+          <div class="social-preview-image">
+            <span>Afbeelding</span>
+          </div>
+          <div class="social-preview-actions">
+            <span>\u2661</span> <span>\uD83D\uDCAC</span> <span>\u2933</span>
+            <span class="social-preview-bookmark">\uD83D\uDD16</span>
+          </div>
+          <div class="social-preview-body">
+            <strong>${orgName?.toLowerCase().replace(/\s+/g, "") || "organisatie"}</strong> ${truncated.replace(/\n/g, " ")}
+          </div>
+        </div>
+      `;
+    }
+  },
+  "LinkedIn": {
+    maxPreview: 210,
+    render: (text, orgName, logoUrl) => {
+      const truncated = text.length > 210 ? text.substring(0, 210) + "... meer weergeven" : text;
+      return `
+        <div class="social-preview social-preview-linkedin">
+          <div class="social-preview-header">
+            <div class="social-preview-avatar">${logoUrl ? `<img src="${logoUrl}" alt="">` : `<span>${(orgName || "O")[0]}</span>`}</div>
+            <div class="social-preview-header-info">
+              <div class="social-preview-username">${orgName || "Organisatie"}</div>
+              <div class="social-preview-meta">Zojuist \u2022 \uD83C\uDF10</div>
+            </div>
+          </div>
+          <div class="social-preview-body">${truncated.replace(/\n/g, "<br>")}</div>
+          <div class="social-preview-engagement">
+            <span>\uD83D\uDC4D 12</span> <span>\uD83D\uDCAC 3 opmerkingen</span>
+          </div>
+          <div class="social-preview-actions">
+            <span>\uD83D\uDC4D Vind ik leuk</span>
+            <span>\uD83D\uDCAC Reageren</span>
+            <span>\u21A9 Delen</span>
+          </div>
+        </div>
+      `;
+    }
+  },
+  "Facebook": {
+    maxPreview: 200,
+    render: (text, orgName, logoUrl) => {
+      const truncated = text.length > 200 ? text.substring(0, 200) + "... Meer weergeven" : text;
+      return `
+        <div class="social-preview social-preview-facebook">
+          <div class="social-preview-header">
+            <div class="social-preview-avatar">${logoUrl ? `<img src="${logoUrl}" alt="">` : `<span>${(orgName || "O")[0]}</span>`}</div>
+            <div class="social-preview-header-info">
+              <div class="social-preview-username">${orgName || "Organisatie"}</div>
+              <div class="social-preview-meta">Zojuist \u2022 \uD83C\uDF10</div>
+            </div>
+          </div>
+          <div class="social-preview-body">${truncated.replace(/\n/g, "<br>")}</div>
+          <div class="social-preview-actions">
+            <span>\uD83D\uDC4D Vind ik leuk</span>
+            <span>\uD83D\uDCAC Reageren</span>
+            <span>\u2933 Delen</span>
+          </div>
+        </div>
+      `;
+    }
+  },
+  "X (Twitter)": {
+    maxPreview: 280,
+    render: (text, orgName, logoUrl) => {
+      const truncated = text.length > 280 ? text.substring(0, 277) + "..." : text;
+      return `
+        <div class="social-preview social-preview-twitter">
+          <div class="social-preview-row">
+            <div class="social-preview-avatar">${logoUrl ? `<img src="${logoUrl}" alt="">` : `<span>${(orgName || "O")[0]}</span>`}</div>
+            <div class="social-preview-content">
+              <div class="social-preview-header-inline">
+                <span class="social-preview-username">${orgName || "Organisatie"}</span>
+                <span class="social-preview-handle">@${orgName?.toLowerCase().replace(/\s+/g, "") || "organisatie"} \u2022 nu</span>
+              </div>
+              <div class="social-preview-body">${truncated.replace(/\n/g, "<br>")}</div>
+              <div class="social-preview-actions">
+                <span>\uD83D\uDCAC 2</span>
+                <span>\uD83D\uDD01 5</span>
+                <span>\u2661 18</span>
+                <span>\u2191</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  },
+  "TikTok": {
+    maxPreview: 150,
+    render: (text, orgName, logoUrl) => {
+      const truncated = text.length > 150 ? text.substring(0, 150) + "..." : text;
+      return `
+        <div class="social-preview social-preview-tiktok">
+          <div class="social-preview-tiktok-overlay">
+            <div class="social-preview-tiktok-sidebar">
+              <div class="social-preview-avatar">${logoUrl ? `<img src="${logoUrl}" alt="">` : `<span>${(orgName || "O")[0]}</span>`}</div>
+              <div class="tiktok-action">\u2661<br>4.2K</div>
+              <div class="tiktok-action">\uD83D\uDCAC<br>89</div>
+              <div class="tiktok-action">\u2933<br>201</div>
+            </div>
+            <div class="social-preview-tiktok-bottom">
+              <strong>@${orgName?.toLowerCase().replace(/\s+/g, "") || "organisatie"}</strong>
+              <div>${truncated.replace(/\n/g, " ")}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  },
+};
+
+function renderSocialPreview(channel, text, orgName, logoUrl) {
+  const platform = SOCIAL_PLATFORMS[channel];
+  if (!platform) return "";
+  return platform.render(text, orgName, logoUrl);
+}
+
 function showPublicatieklaar() {
   const sourceText = state.results.revision || state.results.teksten;
   if (!sourceText) return alert("Er zijn nog geen teksten gegenereerd");
@@ -1208,6 +1485,11 @@ function showPublicatieklaar() {
       `;
     }
 
+    // Social media preview
+    const huisstijl = getHuisstijl();
+    const socialPreviewHtml = renderSocialPreview(block.channel, mainContent, huisstijl.organisatie, state.logoUrl);
+    const hasPreview = !!socialPreviewHtml;
+
     const card = document.createElement("div");
     card.className = "pub-card";
     card.innerHTML = `
@@ -1219,9 +1501,12 @@ function showPublicatieklaar() {
             <div class="pub-channel-type">${meta.type}</div>
           </div>
         </div>
-        <button class="pub-copy-btn" data-index="${i}">
-          Kopieren
-        </button>
+        <div class="pub-card-header-actions">
+          ${hasPreview ? `<button class="btn btn-small btn-secondary pub-preview-toggle" data-index="${i}">Preview</button>` : ""}
+          <button class="pub-copy-btn" data-index="${i}">
+            Kopieren
+          </button>
+        </div>
       </div>
       <div class="pub-card-body">
         ${variantTabsHtml}
@@ -1231,6 +1516,7 @@ function showPublicatieklaar() {
           ${readLabel ? `<span class="readability-badge level-${readLabel.level}">${readLabel.label} (${readability.score})</span>` : ""}
           <span class="pub-char-count" id="pub-count-${i}">${formatCharCount(mainContent.length, block.channel)}</span>
         </div>
+        ${hasPreview ? `<div class="social-preview-container hidden" id="preview-${i}">${socialPreviewHtml}</div>` : ""}
       </div>
     `;
     grid.appendChild(card);
@@ -1268,6 +1554,16 @@ function showPublicatieklaar() {
       });
     }
 
+    // Social preview toggle
+    const previewToggle = card.querySelector(".pub-preview-toggle");
+    if (previewToggle) {
+      previewToggle.addEventListener("click", () => {
+        const container = card.querySelector(`#preview-${i}`);
+        container.classList.toggle("hidden");
+        previewToggle.textContent = container.classList.contains("hidden") ? "Preview" : "Verberg preview";
+      });
+    }
+
     // Copy button
     card.querySelector(".pub-copy-btn").addEventListener("click", (e) => {
       const visibleTextarea = card.querySelector(".pub-textarea:not(.hidden)");
@@ -1282,7 +1578,7 @@ function showPublicatieklaar() {
       });
     });
 
-    // Update counts on input
+    // Update counts and preview on input
     card.querySelectorAll(".pub-textarea").forEach(ta => {
       ta.addEventListener("input", () => {
         const visibleTA = card.querySelector(".pub-textarea:not(.hidden)");
@@ -1295,6 +1591,13 @@ function showPublicatieklaar() {
         if (badge && rl) {
           badge.className = `readability-badge level-${rl.level}`;
           badge.textContent = `${rl.label} (${r.score})`;
+        }
+
+        // Update social preview live
+        const previewContainer = card.querySelector(`#preview-${i}`);
+        if (previewContainer && !previewContainer.classList.contains("hidden")) {
+          const newPreview = renderSocialPreview(block.channel, visibleTA.value, getHuisstijl().organisatie, state.logoUrl);
+          if (newPreview) previewContainer.innerHTML = newPreview;
         }
       });
     });

@@ -275,6 +275,14 @@
           </label>
         </div>
 
+        <div class="form-group">
+          <label class="checkbox crisis-checkbox">
+            <input type="checkbox" id="crisisMode">
+            <span class="crisis-label">Crisismodus</span>
+            <span class="crisis-description">Kortere teksten, feitelijke toon, escalatiechecklist, persverklaring verplicht</span>
+          </label>
+        </div>
+
         <button class="btn btn-primary btn-lg" id="btnStart">
           Start het bureau
           <span class="btn-arrow">&rarr;</span>
@@ -395,6 +403,46 @@
               <span class="agent-status status-waiting">Wacht...</span>
             </div>
             <div class="image-grid" id="imageGrid"></div>
+          </div>
+        </div>
+
+        <!-- Crisis Escalation Checklist -->
+        <div class="crisis-checklist hidden" id="crisisChecklist">
+          <div class="crisis-checklist-header">
+            <span class="crisis-icon">&#9888;&#65039;</span>
+            <h3>Crisis Escalatie Checklist</h3>
+          </div>
+          <div class="crisis-checklist-body">
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Bestuur/directie geïnformeerd</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Raad van Toezicht geïnformeerd</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Woordvoerder aangewezen</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Juridisch advies ingewonnen (indien nodig)</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Persverklaring goedgekeurd door bestuur</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Interne medewerkers eerst geïnformeerd</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Q&A / FAQ opgesteld voor front-office</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Monitoring social media ingeregeld</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Centraal contactpunt/telefoonnummer gecommuniceerd</span>
+            </label>
+            <label class="crisis-check-item">
+              <input type="checkbox"> <span>Evaluatiemoment ingepland (48-72 uur)</span>
+            </label>
           </div>
         </div>
 

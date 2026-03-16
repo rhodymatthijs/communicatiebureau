@@ -169,7 +169,7 @@ Wees formeel, afgewogen en scherp op risico's. Eerste persoon als RvT-lid.`,
 
 // API endpoint: run agent
 app.post("/api/run-agent", async (req, res) => {
-  const { apiKey: bodyKey, agentId, casus, huisstijl, plan, teksten, variantMode } = req.body;
+  const { apiKey: bodyKey, agentId, casus, huisstijl, plan, teksten, variantMode, crisisMode } = req.body;
   const apiKey = bodyKey || process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) return res.status(400).json({ error: "API key is vereist" });
@@ -213,8 +213,44 @@ app.post("/api/run-agent", async (req, res) => {
       userMessage += `**Logo:** ${huisstijl.logoDescription}\n`;
   }
 
-  // Inject variant mode into copywriter system prompt
+  // Inject crisis mode and variant mode into system prompts
   let systemPrompt = agent.systemPrompt;
+
+  if (crisisMode && agentId === "strategist") {
+    systemPrompt += `\n\nCRISISMODUS ACTIEF — Dit is een crisissituatie. Pas je aanpak aan:
+- Prioriteer snelheid en duidelijkheid boven volledigheid
+- Focus op directe schadebeperking en informatievoorziening
+- Voeg een ESCALATIELADDER toe: wie moet wanneer geïnformeerd worden
+- Voeg een WOORDVOERDERSLIJN toe: wie communiceert naar wie
+- Denk aan juridische risico's en mediadruk
+- Plan communicatie in uren, niet in dagen/weken
+- Voeg een Q&A/FAQ sectie toe met te verwachten vragen
+- Persverklaring is VERPLICHT als kanaal`;
+  }
+
+  if (crisisMode && agentId === "copywriter") {
+    systemPrompt += `\n\nCRISISMODUS ACTIEF — Schrijf crisiscommunicatie:
+- Gebruik korte, feitelijke zinnen. Geen bloemrijk taalgebruik
+- Begin elke tekst met de kernfeiten (wie, wat, wanneer, waar)
+- Vermijd speculatie, schuld toewijzen of beloftes die je niet kunt waarmaken
+- Gebruik empathische maar zakelijke toon
+- Voeg bij elke tekst een contactpunt toe voor vragen
+- Houd teksten 30-40% korter dan normaal
+- Persverklaring: gebruik standaard persverklaring-format met quotes van woordvoerder
+- Elke tekst moet consistent zijn in feiten en formulering
+- Voeg GEEN emoji's toe aan crisiscommunicatie`;
+  }
+
+  if (crisisMode && agentId === "visualAdvisor") {
+    systemPrompt += `\n\nCRISISMODUS ACTIEF — Visueel advies bij crisis:
+- Gebruik sobere, rustige beeldtaal. Geen vrolijke of feestelijke visuals
+- Kies neutrale, kalme kleurpaletten
+- Logo prominent maar niet dominant
+- Geen stock-foto's met lachende mensen
+- Overweeg of een visual überhaupt gepast is per kanaal
+- Bij twijfel: alleen tekst, geen beeld`;
+  }
+
   if (variantMode && agentId === "copywriter") {
     systemPrompt += `\n\nBELANGRIJK — A/B VARIANT MODUS:
 Schrijf voor elk kanaal TWEE varianten: Variant A en Variant B.

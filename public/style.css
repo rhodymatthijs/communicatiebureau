@@ -1753,6 +1753,349 @@ select.input {
 }
 
 /* ========================
+   Social Media Previews
+   ======================== */
+.social-preview-container {
+  margin-top: 16px;
+  border-top: 1px solid var(--border-light);
+  padding-top: 16px;
+}
+
+.social-preview {
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  max-width: 400px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.social-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.social-preview-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.social-preview-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.social-preview-avatar span {
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.social-preview-username {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.social-preview-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.social-preview-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.social-preview-body {
+  padding: 0 12px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.social-preview-actions {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-light);
+}
+
+.social-preview-engagement {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Instagram */
+.social-preview-instagram {
+  background: #ffffff;
+}
+
+.social-preview-image {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.social-preview-instagram .social-preview-actions {
+  border-top: none;
+  padding: 10px 12px;
+  font-size: 18px;
+}
+
+.social-preview-bookmark {
+  margin-left: auto;
+}
+
+/* LinkedIn */
+.social-preview-linkedin {
+  background: #ffffff;
+}
+
+.social-preview-linkedin .social-preview-actions {
+  justify-content: space-around;
+}
+
+/* Facebook */
+.social-preview-facebook {
+  background: #ffffff;
+}
+
+.social-preview-facebook .social-preview-actions {
+  justify-content: space-around;
+}
+
+/* Twitter/X */
+.social-preview-twitter {
+  background: #ffffff;
+  padding: 12px;
+}
+
+.social-preview-row {
+  display: flex;
+  gap: 10px;
+}
+
+.social-preview-content {
+  flex: 1;
+}
+
+.social-preview-header-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.social-preview-handle {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.social-preview-twitter .social-preview-body {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.social-preview-twitter .social-preview-actions {
+  border-top: none;
+  padding: 4px 0 0;
+  font-size: 13px;
+  gap: 24px;
+}
+
+/* TikTok */
+.social-preview-tiktok {
+  background: #000;
+  height: 300px;
+  position: relative;
+  border-radius: var(--radius);
+}
+
+.social-preview-tiktok-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.social-preview-tiktok-sidebar {
+  position: absolute;
+  right: 10px;
+  bottom: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.social-preview-tiktok-sidebar .social-preview-avatar {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #fff;
+}
+
+.tiktok-action {
+  color: white;
+  font-size: 11px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.social-preview-tiktok-bottom {
+  padding: 16px;
+  color: white;
+  font-size: 13px;
+  line-height: 1.4;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+}
+
+.social-preview-tiktok-bottom strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.pub-card-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pub-preview-toggle {
+  white-space: nowrap;
+}
+
+/* ========================
+   Crisis Mode
+   ======================== */
+.crisis-checkbox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  background: var(--error-light);
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.crisis-checkbox:hover {
+  border-color: var(--error);
+}
+
+.crisis-checkbox input:checked ~ .crisis-label {
+  color: var(--error);
+}
+
+.crisis-label {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.crisis-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  width: 100%;
+  margin-left: 24px;
+}
+
+/* Crisis Checklist */
+.crisis-checklist {
+  margin-top: 20px;
+  width: 100%;
+}
+
+.crisis-checklist-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
+  border-bottom: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.crisis-icon {
+  font-size: 24px;
+}
+
+.crisis-checklist-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.crisis-checklist-body {
+  background: var(--bg-card);
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
+  border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.crisis-check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.crisis-check-item:hover {
+  background: var(--bg-input);
+}
+
+.crisis-check-item input[type="checkbox"] {
+  accent-color: var(--error);
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.crisis-check-item input:checked + span {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+
+/* ========================
    Utility
    ======================== */
 .hidden {
