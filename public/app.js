@@ -89,20 +89,98 @@ $("#logoFile").addEventListener("change", async (e) => {
   const formData = new FormData();
   formData.append("logo", file);
 
+  let imageUrl;
   try {
     const res = await fetch("/api/upload-logo", { method: "POST", body: formData });
     const data = await res.json();
-    state.logoUrl = data.url;
-    $("#logoPreview").innerHTML = `<img src="${data.url}" alt="Logo">`;
+    imageUrl = data.url;
   } catch {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      state.logoUrl = ev.target.result;
-      $("#logoPreview").innerHTML = `<img src="${ev.target.result}" alt="Logo">`;
-    };
-    reader.readAsDataURL(file);
+    imageUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => resolve(ev.target.result);
+      reader.readAsDataURL(file);
+    });
   }
+
+  state.logoUrl = imageUrl;
+  $("#logoPreview").innerHTML = `<img src="${imageUrl}" alt="Logo">`;
+
+  // Extract dominant colors from logo
+  extractColorsFromImage(imageUrl);
 });
+
+function extractColorsFromImage(src) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const size = 100; // downsample for speed
+    canvas.width = size;
+    canvas.height = size;
+    ctx.drawImage(img, 0, 0, size, size);
+
+    const data = ctx.getImageData(0, 0, size, size).data;
+    const colorBuckets = {};
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+      if (a < 128) continue; // skip transparent
+
+      // Skip near-white, near-black, and grey
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const saturation = max === 0 ? 0 : (max - min) / max;
+      const brightness = max / 255;
+
+      if (saturation < 0.15) continue; // skip greys/whites/blacks
+      if (brightness < 0.1) continue;  // skip very dark
+      if (brightness > 0.95 && saturation < 0.2) continue; // skip near-white
+
+      // Quantize to reduce noise (round to nearest 16)
+      const qr = Math.round(r / 16) * 16;
+      const qg = Math.round(g / 16) * 16;
+      const qb = Math.round(b / 16) * 16;
+      const key = `${qr},${qg},${qb}`;
+
+      colorBuckets[key] = (colorBuckets[key] || 0) + 1;
+    }
+
+    // Sort by frequency
+    const sorted = Object.entries(colorBuckets)
+      .sort((a, b) => b[1] - a[1]);
+
+    if (sorted.length === 0) return;
+
+    // Primary = most common color
+    const primary = sorted[0][0].split(",").map(Number);
+    const primaryHex = rgbToHex(primary[0], primary[1], primary[2]);
+    $("#colorPrimary").value = primaryHex;
+
+    // Secondary = second most common, but sufficiently different from primary
+    if (sorted.length > 1) {
+      let secondaryHex = primaryHex;
+      for (let i = 1; i < sorted.length; i++) {
+        const c = sorted[i][0].split(",").map(Number);
+        const dist = Math.sqrt(
+          (primary[0]-c[0])**2 + (primary[1]-c[1])**2 + (primary[2]-c[2])**2
+        );
+        if (dist > 60) { // sufficiently different
+          secondaryHex = rgbToHex(c[0], c[1], c[2]);
+          break;
+        }
+      }
+      $("#colorSecondary").value = secondaryHex;
+    }
+  };
+  img.src = src;
+}
+
+function rgbToHex(r, g, b) {
+  return "#" + [r, g, b].map(v =>
+    Math.min(255, Math.max(0, v)).toString(16).padStart(2, "0")
+  ).join("");
+}
 
 // ========================
 // Form Data
