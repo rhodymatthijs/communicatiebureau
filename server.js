@@ -191,6 +191,12 @@ app.post("/api/run-agent", async (req, res) => {
   if (casus.context) {
     userMessage += `\n**Extra context:** ${casus.context}`;
   }
+  if (casus.links) {
+    userMessage += `\n**Referentie-links:**\n${casus.links}`;
+  }
+  if (casus.documenten) {
+    userMessage += `\n\n## Bijgevoegde documenten\n${casus.documenten}`;
+  }
 
   if (huisstijl) {
     userMessage += `\n\n## Huisstijl\n`;

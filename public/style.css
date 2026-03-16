@@ -782,6 +782,74 @@ select.input {
   font-size: 13px;
 }
 
+/* Document upload */
+.doc-upload-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.doc-item-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+}
+
+.doc-item-size {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.doc-remove {
+  background: none;
+  border: none;
+  color: var(--error);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+}
+
+/* User feedback */
+.user-feedback-section {
+  margin-top: 16px;
+  width: 100%;
+}
+
+.user-feedback-section .agent-card {
+  border-color: var(--accent);
+}
+
+.user-feedback-section textarea {
+  margin-top: 12px;
+}
+
+/* Revision counter */
+.revision-count {
+  background: rgba(255,255,255,0.2);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
 /* Publicatieklaar */
 .pub-intro {
   color: var(--text-muted);

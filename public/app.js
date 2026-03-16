@@ -3,6 +3,9 @@ const state = {
   apiKey: "",
   openaiKey: "",
   logoUrl: null,
+  documents: [],
+  revisionRound: 0,
+  userFeedback: "",
   results: { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] },
 };
 
@@ -105,10 +108,15 @@ $("#logoFile").addEventListener("change", async (e) => {
 // Form Data
 // ========================
 function getCasus() {
+  const links = $("#casusLinks")?.value.trim();
+  const docTexts = state.documents.map(d => `[Document: ${d.name}]\n${d.content}`).join("\n\n");
+
   return {
     titel: $("#casusTitel").value.trim(),
     beschrijving: $("#casusBeschrijving").value.trim(),
     context: $("#casusContext").value.trim(),
+    links: links || "",
+    documenten: docTexts || "",
     urgentie: $("#casusUrgentie").value.trim(),
     doelgroepen: $$(
       '.checkbox-inline .checkbox input:checked'
@@ -250,6 +258,11 @@ async function runRevision() {
     feedbackMap[stakeholderNames[id] || id] = text;
   }
 
+  // Eigen feedback van de gebruiker toevoegen
+  if (state.userFeedback.trim()) {
+    feedbackMap["Opdrachtgever (Rhody)"] = state.userFeedback;
+  }
+
   const payload = {
     apiKey: state.apiKey,
     casus: getCasus(),
@@ -297,7 +310,7 @@ const STAKEHOLDER_PERSONAS = {
     name: "Annemarie Kuiper",
     role: "43 jaar, twee kinderen op school, werkt parttime in de zorg, actief MR-lid",
     bio: "Leest elke brief twee keer. Wil weten wat het voor haar kinderen betekent.",
-    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=AnnemarieKuiper5&top=longHairStraight2&hairColor=2c1b18&facialHairProbability=0&skinColor=ffdbb4&clothing=collarAndSweater&clothingColor=22c55e&accessoriesProbability=0",
+    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=AnnemarieKuiper22",
   },
   leerling: {
     name: "Thomas Jansen",
@@ -309,7 +322,7 @@ const STAKEHOLDER_PERSONAS = {
     name: "Linda Peters",
     role: "47 jaar, docent Nederlands, sectievoorzitter, pragmatisch",
     bio: "Heeft al 200 veranderingen overleefd. Wil weten: wat moet ik morgen anders doen?",
-    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=LindaPeters6&top=longHairBob&hairColor=a55728&facialHairProbability=0&skinColor=ffdbb4&clothing=blazerAndShirt&clothingColor=f97316&accessoriesProbability=0",
+    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=LindaPeters33",
   },
   directeur: {
     name: "Robert van der Helm",
@@ -321,7 +334,7 @@ const STAKEHOLDER_PERSONAS = {
     name: "Elisabeth Brouwer",
     role: "61 jaar, oud-bestuurder, governance-expert, scherp op risico's",
     bio: "Ziet dingen die anderen missen. Stelt de vragen die niemand durft te stellen.",
-    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=ElisabethBrouwer9&top=longHairCurly&hairColor=c93305&facialHairProbability=0&skinColor=ffdbb4&clothing=blazerAndSweater&clothingColor=7c3aed&accessories=prescription01&accessoriesProbability=100",
+    avatar: "https://api.dicebear.com/9.x/avataaars/svg?seed=ElisabethBrouwer44",
   },
 };
 
@@ -465,20 +478,36 @@ async function runImageGeneration() {
 // Revision Pipeline
 // ========================
 async function runRevisionPipeline() {
-  if (Object.keys(state.results.stakeholders).length === 0) {
-    return alert("Er is nog geen stakeholder feedback om te verwerken");
+  const hasStakeholderFeedback = Object.keys(state.results.stakeholders).length > 0;
+  const hasUserFeedback = state.userFeedback.trim().length > 0;
+
+  if (!hasStakeholderFeedback && !hasUserFeedback) {
+    return alert("Er is nog geen feedback om te verwerken. Geef eigen feedback of wacht op stakeholder-reviews.");
   }
+
+  state.revisionRound++;
 
   // Show revision section
   $("#revisionArrow").classList.remove("hidden");
   $("#card-revision").classList.remove("hidden");
 
+  // Update revision count badge
+  const countEl = $("#revisionCount");
+  if (countEl) countEl.textContent = state.revisionRound > 1 ? `#${state.revisionRound}` : "";
+
   try {
-    setAgentStatus("card-revision", "active", "Bezig met revisie...");
+    setAgentStatus("card-revision", "active", `Revisieronde ${state.revisionRound}...`);
     const revision = await runRevision();
     state.results.revision = revision;
-    setAgentStatus("card-revision", "done", "Klaar");
+    // Update teksten zodat volgende revisie op de laatste versie werkt
+    state.results.teksten = revision;
+    setAgentStatus("card-revision", "done", `Ronde ${state.revisionRound} klaar`);
     setAgentOutput("card-revision", mdToHtml(revision));
+
+    // Clear user feedback na verwerking
+    const feedbackEl = $("#userFeedbackText");
+    if (feedbackEl) feedbackEl.value = "";
+    state.userFeedback = "";
   } catch (err) {
     setAgentStatus("card-revision", "error", "Fout");
     setAgentOutput("card-revision", `<p style="color:var(--error)">${err.message}</p>`);
@@ -573,6 +602,8 @@ async function runPipeline() {
 
   // Show actions
   $("#actionsBar").classList.remove("hidden");
+  // Show user feedback section
+  $("#userFeedbackSection").classList.remove("hidden");
 }
 
 // ========================
@@ -876,6 +907,13 @@ $("#btnNewCasus").addEventListener("click", () => {
   $("#stepWarRoom").classList.add("hidden");
   $("#stepCasus").classList.remove("hidden");
   state.results = { plan: "", teksten: "", visuals: "", revision: "", stakeholders: {}, images: [] };
+  state.revisionRound = 0;
+  state.userFeedback = "";
+  const feedbackEl = $("#userFeedbackText");
+  if (feedbackEl) feedbackEl.value = "";
+  $("#userFeedbackSection").classList.add("hidden");
+  const countEl = $("#revisionCount");
+  if (countEl) countEl.textContent = "";
 
   ["card-strategist", "card-copywriter", "card-visualAdvisor"].forEach((id) => {
     setAgentStatus(id, "waiting", "Wacht...");
@@ -896,6 +934,56 @@ $("#btnNewCasus").addEventListener("click", () => {
 $("#btnRevision").addEventListener("click", runRevisionPipeline);
 $("#btnGenerateImages").addEventListener("click", runImageGeneration);
 $("#btnPublicatieklaar").addEventListener("click", showPublicatieklaar);
+
+// Eigen feedback toggle
+$("#btnUserFeedback").addEventListener("click", () => {
+  const section = $("#userFeedbackSection");
+  section.classList.toggle("hidden");
+  if (!section.classList.contains("hidden")) {
+    $("#userFeedbackText").focus();
+  }
+});
+
+// Track user feedback
+$("#userFeedbackText").addEventListener("input", (e) => {
+  state.userFeedback = e.target.value;
+});
+
+// Document upload
+$("#btnUploadDocs").addEventListener("click", () => $("#docFiles").click());
+$("#docFiles").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files);
+  for (const file of files) {
+    try {
+      const text = await file.text();
+      state.documents.push({ name: file.name, size: file.size, content: text });
+      renderDocList();
+    } catch {
+      // Binary file — read as base64 description
+      state.documents.push({ name: file.name, size: file.size, content: `[Binair bestand: ${file.name}, ${(file.size/1024).toFixed(0)}KB]` });
+      renderDocList();
+    }
+  }
+  e.target.value = "";
+});
+
+function renderDocList() {
+  const list = $("#docList");
+  list.innerHTML = state.documents.map((d, i) => `
+    <div class="doc-item">
+      <span class="doc-item-name">📄 ${d.name}</span>
+      <span class="doc-item-size">${(d.size/1024).toFixed(0)} KB</span>
+      <button class="doc-remove" data-index="${i}">&times;</button>
+    </div>
+  `).join("");
+
+  list.querySelectorAll(".doc-remove").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      state.documents.splice(parseInt(e.target.dataset.index), 1);
+      renderDocList();
+    });
+  });
+}
 $("#btnExportMd").addEventListener("click", exportMarkdown);
 $("#btnExportPdf").addEventListener("click", exportPdf);
 
